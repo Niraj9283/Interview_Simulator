@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MockMate AI
 
-## Getting Started
+Real-time AI interview simulator MVP with resume-aware question generation, webcam and microphone signals, adaptive scoring, and a FastAPI backend contract.
 
-First, run the development server:
+## Current Build
+
+- Next.js interview workspace with setup, live interview, signal dashboard, feedback, and score trends.
+- Local resume keyword extraction for `.txt`, `.md`, and `.csv` uploads.
+- Webcam preview and microphone signal analysis through browser media APIs.
+- Deterministic scoring for clarity, relevance, structure, confidence, voice, and eye contact.
+- FastAPI endpoints for resume analysis, session start, answer evaluation, and WebSocket events.
+- Docker Compose scaffold for frontend, backend, PostgreSQL, and Chroma.
+
+## Run Frontend
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run Backend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-## Learn More
+Health check:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+curl http://localhost:8000/health
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docker
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose up --build
+```
 
-## Deploy on Vercel
+Frontend: `http://localhost:3000`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Backend: `http://localhost:8000`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Chroma: `http://localhost:8001`
+
+## Next Milestones
+
+- Replace heuristic question generation with an LLM interviewer service.
+- Add Whisper transcription and stream partial transcripts over WebSockets.
+- Parse PDF/DOCX resumes in the backend and store embeddings in Chroma.
+- Persist users, sessions, answers, and scores in PostgreSQL.
+- Add a live coding panel for DSA interviews.
+- Benchmark end-to-end latency for transcription, retrieval, generation, and scoring.
