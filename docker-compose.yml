@@ -1,0 +1,46 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://mockmate:mockmate@postgres:5432/mockmate
+      CHROMA_URL: http://chroma:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - chroma
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: mockmate
+      POSTGRES_USER: mockmate
+      POSTGRES_PASSWORD: mockmate
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+
+volumes:
+  postgres-data:
+  chroma-data:

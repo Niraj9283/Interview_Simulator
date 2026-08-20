@@ -1,0 +1,962 @@
+{
+  "departments": [
+    {
+      "id": "Technical",
+      "label": "Technical Department",
+      "tracks": ["Role Specific", "DSA", "System Design", "Behavioral"],
+      "roles": [
+        {
+          "title": "Full Stack AI Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you integrate an AI feature into a full-stack product while keeping latency and cost under control?",
+              "Describe how you would design the frontend, API layer, and model-service boundary for an AI assistant feature."
+            ],
+            "DSA": [
+              "Design an algorithm to rank candidate answers by relevance, recency, and confidence. Include time and space complexity.",
+              "How would you optimize a semantic search feature when the top-k retrieval step becomes slow at scale?"
+            ],
+            "System Design": [
+              "Design a production AI interview platform with resume upload, adaptive questions, scoring, and audit logs.",
+              "What storage, caching, and queueing choices would you make for a high-traffic AI assessment system?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you shipped an AI feature with uncertain requirements. How did you reduce risk?"
+            ]
+          }
+        },
+        {
+          "title": "Software Engineer",
+          "questions": {
+            "Role Specific": [
+              "Walk me through how you debug a production defect from first alert to permanent fix.",
+              "How do you balance clean architecture with delivery speed when building a new feature?"
+            ],
+            "DSA": [
+              "Given a stream of events, design an algorithm to detect the top recurring errors in real time.",
+              "Explain how you would choose between a hash map, heap, and balanced tree for a scheduling problem."
+            ],
+            "System Design": [
+              "Design a service that accepts user actions, validates them, and exposes reliable history to clients.",
+              "How would you add observability and rollback safety to a business-critical API?"
+            ],
+            "Behavioral": [
+              "Describe a time you improved code quality without slowing the team down."
+            ]
+          }
+        },
+        {
+          "title": "Frontend Developer",
+          "questions": {
+            "Role Specific": [
+              "How would you structure a complex React screen with forms, server state, validation, and loading states?",
+              "What steps would you take to improve performance on a page with slow rendering and frequent re-renders?"
+            ],
+            "DSA": [
+              "Design an autocomplete algorithm for a large list of suggestions and explain the data structure you would use.",
+              "How would you efficiently virtualize and search a table with thousands of rows on the client?"
+            ],
+            "System Design": [
+              "Design the frontend architecture for a dashboard that supports live updates, filters, and offline recovery.",
+              "How would you organize component boundaries, state, and API calls in a large frontend codebase?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you advocated for accessibility or UX quality in a deadline-driven project."
+            ]
+          }
+        },
+        {
+          "title": "Backend Developer",
+          "questions": {
+            "Role Specific": [
+              "How would you design an API contract that remains stable while product requirements change?",
+              "Describe your approach to database transactions, retries, and idempotency in backend services."
+            ],
+            "DSA": [
+              "Design a rate limiter for API requests. Compare token bucket and sliding window approaches.",
+              "How would you find duplicate jobs in a large queue while minimizing memory usage?"
+            ],
+            "System Design": [
+              "Design a backend service for order processing with retries, audit trails, and failure recovery.",
+              "How would you scale a read-heavy API while preserving consistency for recent writes?"
+            ],
+            "Behavioral": [
+              "Describe a production incident you handled and what changed after the postmortem."
+            ]
+          }
+        },
+        {
+          "title": "Mobile App Developer",
+          "questions": {
+            "Role Specific": [
+              "How would you build an offline-first mobile workflow that syncs safely when the network returns?",
+              "What tradeoffs do you consider when choosing native, cross-platform, or hybrid mobile development?"
+            ],
+            "DSA": [
+              "Design an algorithm to sync local changes with server changes and resolve conflicts predictably.",
+              "How would you optimize image caching and eviction on a device with limited storage?"
+            ],
+            "System Design": [
+              "Design the client and backend flow for push notifications, deep links, and user preferences.",
+              "How would you monitor mobile app crashes and release health after deployment?"
+            ],
+            "Behavioral": [
+              "Tell me about a time user feedback changed your implementation plan."
+            ]
+          }
+        },
+        {
+          "title": "Data Scientist",
+          "questions": {
+            "Role Specific": [
+              "How would you define success metrics for a predictive model before starting analysis?",
+              "Explain how you handle missing data, leakage, and biased samples in a modeling project."
+            ],
+            "DSA": [
+              "Design an efficient method to compute rolling aggregates over millions of timestamped records.",
+              "How would you select the nearest records in a high-dimensional feature space?"
+            ],
+            "System Design": [
+              "Design an analytics workflow from raw event collection to model training and reporting.",
+              "How would you monitor model drift and data quality after deployment?"
+            ],
+            "Behavioral": [
+              "Tell me about a time your analysis changed a business decision."
+            ]
+          }
+        },
+        {
+          "title": "Machine Learning Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you take a model from notebook experimentation to a reliable production service?",
+              "Describe how you version data, features, model artifacts, and evaluation results."
+            ],
+            "DSA": [
+              "Design an algorithm to batch inference requests while respecting latency limits.",
+              "How would you optimize nearest-neighbor retrieval for a recommendation system?"
+            ],
+            "System Design": [
+              "Design an ML serving platform with model registry, canary release, and rollback support.",
+              "How would you build a feature store that supports both training and low-latency inference?"
+            ],
+            "Behavioral": [
+              "Describe a time you explained a model limitation to a non-technical stakeholder."
+            ]
+          }
+        },
+        {
+          "title": "Data Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you design a reliable ETL pipeline for late-arriving and duplicate events?",
+              "What checks would you add to detect schema drift and data quality issues?"
+            ],
+            "DSA": [
+              "Design an algorithm to deduplicate records across multiple large files.",
+              "How would you compute top categories from a stream without storing every event?"
+            ],
+            "System Design": [
+              "Design a data platform that supports batch pipelines, streaming ingestion, and warehouse reporting.",
+              "How would you handle backfills without breaking downstream dashboards?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you made a data pipeline easier for analysts or engineers to trust."
+            ]
+          }
+        },
+        {
+          "title": "DevOps Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you design a CI/CD pipeline that supports fast releases and safe rollback?",
+              "What signals would you monitor to detect infrastructure instability early?"
+            ],
+            "DSA": [
+              "Design an algorithm to schedule deployment jobs across agents with capacity limits.",
+              "How would you detect dependency cycles in infrastructure provisioning tasks?"
+            ],
+            "System Design": [
+              "Design an automated deployment platform for multiple services across staging and production.",
+              "How would you structure secrets, observability, and incident response for cloud infrastructure?"
+            ],
+            "Behavioral": [
+              "Describe a time you reduced operational toil for a team."
+            ]
+          }
+        },
+        {
+          "title": "Cloud Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you design a secure cloud network for public APIs and private databases?",
+              "Explain your approach to cost control for compute, storage, and managed services."
+            ],
+            "DSA": [
+              "Design an algorithm to place workloads across regions based on latency, cost, and capacity.",
+              "How would you find underused resources from a large set of cloud metrics?"
+            ],
+            "System Design": [
+              "Design a multi-region cloud architecture for a customer-facing application.",
+              "How would you implement backup, disaster recovery, and access control for critical systems?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you influenced a team to adopt a more secure cloud practice."
+            ]
+          }
+        },
+        {
+          "title": "Cybersecurity Analyst",
+          "questions": {
+            "Role Specific": [
+              "How would you triage a suspicious login pattern and decide whether it is an incident?",
+              "What controls would you recommend to reduce phishing and credential theft risk?"
+            ],
+            "DSA": [
+              "Design an algorithm to detect unusual authentication activity from event logs.",
+              "How would you match threat indicators against a large stream of network events?"
+            ],
+            "System Design": [
+              "Design a security monitoring pipeline that ingests logs, detects anomalies, and escalates alerts.",
+              "How would you structure access reviews and audit evidence for a regulated system?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you had to communicate a security risk without creating panic."
+            ]
+          }
+        },
+        {
+          "title": "QA Automation Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you decide which tests belong at unit, integration, API, and end-to-end levels?",
+              "Describe how you make flaky automated tests trustworthy again."
+            ],
+            "DSA": [
+              "Design an algorithm to minimize a failing test set while preserving bug reproduction.",
+              "How would you prioritize test execution when time and compute are limited?"
+            ],
+            "System Design": [
+              "Design a test automation platform that supports parallel runs, reporting, and failure triage.",
+              "How would you add quality gates to a CI pipeline without blocking healthy releases?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you improved quality culture across engineering and product."
+            ]
+          }
+        },
+        {
+          "title": "Database Administrator",
+          "questions": {
+            "Role Specific": [
+              "How would you investigate a slow query that recently became a production issue?",
+              "Explain your backup, restore, and disaster recovery strategy for a critical database."
+            ],
+            "DSA": [
+              "How do indexes improve lookup complexity, and when can they hurt write performance?",
+              "Design an approach to find and archive stale records from a very large table."
+            ],
+            "System Design": [
+              "Design a database architecture for high availability, read scaling, and safe schema migration.",
+              "How would you plan capacity and monitoring for a rapidly growing transactional database?"
+            ],
+            "Behavioral": [
+              "Describe a time you prevented a database change from causing production risk."
+            ]
+          }
+        },
+        {
+          "title": "UI/UX Developer",
+          "questions": {
+            "Role Specific": [
+              "How do you translate a design into accessible, responsive, production-ready UI?",
+              "What process do you use to resolve a conflict between visual design and technical feasibility?"
+            ],
+            "DSA": [
+              "Design an efficient layout search or filtering interaction for a large component library.",
+              "How would you optimize rendering for a canvas or animation-heavy interface?"
+            ],
+            "System Design": [
+              "Design a shared design system implementation for multiple product teams.",
+              "How would you build theme, token, and component versioning into a frontend platform?"
+            ],
+            "Behavioral": [
+              "Tell me about a time usability testing changed your implementation."
+            ]
+          }
+        },
+        {
+          "title": "Technical Support Engineer",
+          "questions": {
+            "Role Specific": [
+              "How would you troubleshoot a customer issue when logs are incomplete and reproduction is difficult?",
+              "Describe how you turn recurring support problems into product or documentation improvements."
+            ],
+            "DSA": [
+              "Design an algorithm to group similar support tickets based on symptoms and error messages.",
+              "How would you prioritize incidents using severity, customer impact, and age?"
+            ],
+            "System Design": [
+              "Design a support diagnostics dashboard that connects tickets, logs, and product events.",
+              "How would you safely collect customer diagnostics while protecting sensitive data?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you handled an upset customer and protected the engineering team focus."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Finance",
+      "label": "Finance Department",
+      "tracks": ["Role Specific", "Case Study", "Behavioral"],
+      "roles": [
+        {
+          "title": "Financial Analyst",
+          "questions": {
+            "Role Specific": [
+              "How would you analyze a revenue decline across products, regions, and customer segments?",
+              "What assumptions do you test first when building a financial forecast?"
+            ],
+            "Case Study": [
+              "A business unit missed its quarterly margin target by 6 percent. How would you investigate and present the drivers?"
+            ],
+            "Behavioral": [
+              "Tell me about a time your analysis influenced a leadership decision."
+            ]
+          }
+        },
+        {
+          "title": "Accountant",
+          "questions": {
+            "Role Specific": [
+              "Walk me through your month-end close process and the controls you rely on.",
+              "How do you investigate and resolve a reconciliation mismatch?"
+            ],
+            "Case Study": [
+              "A vendor invoice was booked in the wrong period and affects reporting. What steps would you take?"
+            ],
+            "Behavioral": [
+              "Describe a time you found an accounting error and handled it professionally."
+            ]
+          }
+        },
+        {
+          "title": "Accounts Payable Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you validate invoices, purchase orders, approvals, and payment timing?",
+              "What controls reduce duplicate payments and vendor fraud?"
+            ],
+            "Case Study": [
+              "A critical vendor says payment is overdue, but the invoice is not in the system. How do you handle it?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you improved a repetitive finance process."
+            ]
+          }
+        },
+        {
+          "title": "Accounts Receivable Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you reduce overdue receivables without damaging customer relationships?",
+              "Explain how you track collections, disputes, credits, and cash application accuracy."
+            ],
+            "Case Study": [
+              "A major customer disputes several invoices near quarter close. What is your action plan?"
+            ],
+            "Behavioral": [
+              "Describe a time you resolved a payment dispute with patience and clarity."
+            ]
+          }
+        },
+        {
+          "title": "Auditor",
+          "questions": {
+            "Role Specific": [
+              "How do you plan an audit scope based on risk and materiality?",
+              "What evidence would you gather to test revenue recognition controls?"
+            ],
+            "Case Study": [
+              "You identify inconsistent approval records during an audit. How would you evaluate the issue and communicate it?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you raised a difficult finding to a stakeholder."
+            ]
+          }
+        },
+        {
+          "title": "Tax Consultant",
+          "questions": {
+            "Role Specific": [
+              "How do you keep tax positions compliant while still supporting business goals?",
+              "What information do you need before advising on a cross-border transaction?"
+            ],
+            "Case Study": [
+              "A company is launching in a new state or country. How would you identify tax obligations and risks?"
+            ],
+            "Behavioral": [
+              "Describe a time you explained a complex tax issue to a non-finance audience."
+            ]
+          }
+        },
+        {
+          "title": "Payroll Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you ensure payroll accuracy across salary changes, overtime, benefits, and deductions?",
+              "What steps do you take when an employee reports an incorrect paycheck?"
+            ],
+            "Case Study": [
+              "A payroll file failed hours before processing deadline. How would you recover safely?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you handled confidential employee data responsibly."
+            ]
+          }
+        },
+        {
+          "title": "Budget Analyst",
+          "questions": {
+            "Role Specific": [
+              "How would you build and monitor a department budget with changing headcount plans?",
+              "What variance signals would you escalate versus track for the next cycle?"
+            ],
+            "Case Study": [
+              "Marketing requests additional budget mid-quarter after overspending. How would you evaluate the request?"
+            ],
+            "Behavioral": [
+              "Describe a time you challenged a budget assumption constructively."
+            ]
+          }
+        },
+        {
+          "title": "FP&A Analyst",
+          "questions": {
+            "Role Specific": [
+              "How do you build a rolling forecast that remains useful when business conditions change?",
+              "What metrics would you include in an executive finance dashboard?"
+            ],
+            "Case Study": [
+              "Bookings are up, but cash flow is tightening. How would you diagnose the gap?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you simplified a model so stakeholders could act on it."
+            ]
+          }
+        },
+        {
+          "title": "Treasury Analyst",
+          "questions": {
+            "Role Specific": [
+              "How do you forecast cash needs and manage liquidity risk?",
+              "What factors influence your recommendation for debt, investment, or cash reserve decisions?"
+            ],
+            "Case Study": [
+              "The company expects a temporary cash shortfall next month. How would you evaluate options?"
+            ],
+            "Behavioral": [
+              "Describe a time you made a risk-sensitive recommendation under time pressure."
+            ]
+          }
+        },
+        {
+          "title": "Risk Analyst",
+          "questions": {
+            "Role Specific": [
+              "How do you identify, quantify, and monitor financial or operational risk?",
+              "What makes a risk control effective and measurable?"
+            ],
+            "Case Study": [
+              "A new supplier could reduce cost but increases concentration risk. How would you evaluate it?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you persuaded others to take a risk more seriously."
+            ]
+          }
+        },
+        {
+          "title": "Investment Analyst",
+          "questions": {
+            "Role Specific": [
+              "How would you evaluate whether an investment opportunity is attractive?",
+              "What qualitative factors do you consider alongside valuation metrics?"
+            ],
+            "Case Study": [
+              "A target company has strong growth but weak margins. How would you assess whether it is worth pursuing?"
+            ],
+            "Behavioral": [
+              "Describe a time you changed your view after new data challenged your thesis."
+            ]
+          }
+        },
+        {
+          "title": "Finance Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you set finance priorities across close, planning, controls, and stakeholder support?",
+              "What routines help you keep financial reporting accurate and decision-oriented?"
+            ],
+            "Case Study": [
+              "Two department heads disagree about cost allocation. How would you resolve it with data and fairness?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you coached a finance team through a difficult reporting cycle."
+            ]
+          }
+        },
+        {
+          "title": "Compliance Analyst",
+          "questions": {
+            "Role Specific": [
+              "How do you monitor compliance obligations and make sure evidence is audit-ready?",
+              "What steps do you take when a process owner misses a required control?"
+            ],
+            "Case Study": [
+              "A regulator requests documentation on short notice. How would you coordinate the response?"
+            ],
+            "Behavioral": [
+              "Describe a time you improved compliance without making the process harder for teams."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "HR",
+      "label": "HR Department",
+      "tracks": ["Role Specific", "Case Study", "Behavioral"],
+      "roles": [
+        {
+          "title": "HR Generalist",
+          "questions": {
+            "Role Specific": [
+              "How do you balance employee support, policy consistency, and business needs?",
+              "What steps do you take when an employee relations issue is sensitive and unclear?"
+            ],
+            "Case Study": [
+              "A manager reports repeated conflict within a team. How would you investigate and guide next steps?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you handled confidential information with care."
+            ]
+          }
+        },
+        {
+          "title": "Recruiter",
+          "questions": {
+            "Role Specific": [
+              "How do you build a sourcing strategy for a hard-to-fill role?",
+              "What signals help you judge candidate quality beyond keyword matching?"
+            ],
+            "Case Study": [
+              "A hiring manager rejects qualified candidates late in the process. How would you reset alignment?"
+            ],
+            "Behavioral": [
+              "Describe a time you improved candidate experience."
+            ]
+          }
+        },
+        {
+          "title": "Talent Acquisition Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you design an end-to-end hiring funnel for a new department?",
+              "What recruiting metrics do you track and how do you act on them?"
+            ],
+            "Case Study": [
+              "Time-to-fill is increasing while offer acceptance is dropping. How would you diagnose the problem?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you influenced a hiring team to make a fairer decision."
+            ]
+          }
+        },
+        {
+          "title": "HR Business Partner",
+          "questions": {
+            "Role Specific": [
+              "How do you translate business priorities into a people plan?",
+              "What data would you review before advising a leader on team structure?"
+            ],
+            "Case Study": [
+              "A department has high attrition and low engagement. How would you partner with leadership?"
+            ],
+            "Behavioral": [
+              "Describe a time you challenged a leader constructively."
+            ]
+          }
+        },
+        {
+          "title": "Training and Development Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you identify training needs and measure learning effectiveness?",
+              "What makes a training program practical enough for employees to apply?"
+            ],
+            "Case Study": [
+              "Customer satisfaction dropped after a process change. How would you design a targeted training response?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you made learning engaging for a resistant audience."
+            ]
+          }
+        },
+        {
+          "title": "Learning and Development Manager",
+          "questions": {
+            "Role Specific": [
+              "How would you build a learning roadmap for first-time managers?",
+              "What metrics would you use to connect learning programs to business outcomes?"
+            ],
+            "Case Study": [
+              "Leadership wants a company-wide upskilling program with limited budget. How would you prioritize?"
+            ],
+            "Behavioral": [
+              "Describe a time you coached others through a capability gap."
+            ]
+          }
+        },
+        {
+          "title": "Compensation and Benefits Analyst",
+          "questions": {
+            "Role Specific": [
+              "How do you benchmark compensation and handle pay equity concerns?",
+              "What factors do you consider when evaluating a benefits program?"
+            ],
+            "Case Study": [
+              "Several employees raise concerns about salary fairness. How would you analyze and communicate findings?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you explained sensitive compensation data clearly."
+            ]
+          }
+        },
+        {
+          "title": "Payroll HR Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you coordinate HR changes with payroll accuracy and deadlines?",
+              "What checks help prevent errors in benefits, deductions, and employee status changes?"
+            ],
+            "Case Study": [
+              "A group of employees has incorrect deductions after a benefits update. How would you resolve it?"
+            ],
+            "Behavioral": [
+              "Describe a time you improved trust between HR, payroll, and employees."
+            ]
+          }
+        },
+        {
+          "title": "Employee Relations Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you conduct a fair employee relations investigation?",
+              "What documentation standards do you follow for performance or conduct cases?"
+            ],
+            "Case Study": [
+              "An employee reports harassment but asks you not to tell anyone. How would you respond?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you stayed neutral during a tense workplace situation."
+            ]
+          }
+        },
+        {
+          "title": "HR Operations Coordinator",
+          "questions": {
+            "Role Specific": [
+              "How do you keep HR processes accurate, consistent, and easy for employees to use?",
+              "What would you automate first in a high-volume HR operations workflow?"
+            ],
+            "Case Study": [
+              "Employee records across two systems do not match. How would you clean up the data and prevent recurrence?"
+            ],
+            "Behavioral": [
+              "Describe a time you improved an internal service experience."
+            ]
+          }
+        },
+        {
+          "title": "People Analytics Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you analyze retention risk while protecting employee privacy?",
+              "What people metrics are useful, and which can be misleading without context?"
+            ],
+            "Case Study": [
+              "Engagement scores dropped in one department. How would you investigate the cause?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you helped leaders act on people data responsibly."
+            ]
+          }
+        },
+        {
+          "title": "Onboarding Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you design a 30-60-90 day onboarding journey for new hires?",
+              "What signals show that onboarding is working or failing?"
+            ],
+            "Case Study": [
+              "New hires report confusion after their first week. How would you improve the experience?"
+            ],
+            "Behavioral": [
+              "Describe a time you helped someone become productive quickly."
+            ]
+          }
+        },
+        {
+          "title": "Diversity and Inclusion Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you design inclusion initiatives that are measurable and trusted?",
+              "What data would you review before recommending a DEI program?"
+            ],
+            "Case Study": [
+              "Promotion rates differ across employee groups. How would you investigate and propose action?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you facilitated a sensitive conversation with respect."
+            ]
+          }
+        },
+        {
+          "title": "HR Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you set priorities for an HR team supporting multiple business functions?",
+              "What routines help you maintain policy consistency while still showing empathy?"
+            ],
+            "Case Study": [
+              "A senior leader wants to bypass a policy for a high performer. How would you respond?"
+            ],
+            "Behavioral": [
+              "Describe a time you developed an HR team member."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Marketing",
+      "label": "Marketing Department",
+      "tracks": ["Role Specific", "Case Study", "Behavioral"],
+      "roles": [
+        {
+          "title": "Marketing Coordinator",
+          "questions": {
+            "Role Specific": [
+              "How do you organize campaign tasks, approvals, assets, and deadlines across teams?",
+              "What metrics would you track for a multi-channel campaign launch?"
+            ],
+            "Case Study": [
+              "A campaign launch is delayed because assets and approvals are missing. How would you recover?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you kept a project moving despite changing priorities."
+            ]
+          }
+        },
+        {
+          "title": "Digital Marketing Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you build a digital campaign across paid, owned, and email channels?",
+              "What data tells you whether a campaign needs budget, creative, or targeting changes?"
+            ],
+            "Case Study": [
+              "Traffic increased but conversions dropped. How would you diagnose and improve performance?"
+            ],
+            "Behavioral": [
+              "Describe a time you used campaign data to change your plan."
+            ]
+          }
+        },
+        {
+          "title": "Content Marketing Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you choose content topics that support both audience needs and business goals?",
+              "What does your process look like from brief to distribution to performance review?"
+            ],
+            "Case Study": [
+              "A blog series gets traffic but no qualified leads. How would you improve it?"
+            ],
+            "Behavioral": [
+              "Tell me about a time feedback made your content stronger."
+            ]
+          }
+        },
+        {
+          "title": "SEO Specialist",
+          "questions": {
+            "Role Specific": [
+              "How would you prioritize technical SEO, content optimization, and backlink opportunities?",
+              "What steps would you take after a sudden organic traffic drop?"
+            ],
+            "Case Study": [
+              "A competitor outranks the company for a high-value keyword. How would you build a response plan?"
+            ],
+            "Behavioral": [
+              "Describe a time you explained SEO tradeoffs to a stakeholder."
+            ]
+          }
+        },
+        {
+          "title": "Social Media Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you build a social calendar that balances brand voice, trends, and campaign goals?",
+              "What metrics help you distinguish engagement quality from vanity metrics?"
+            ],
+            "Case Study": [
+              "A post receives negative attention unexpectedly. How would you respond and escalate?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you protected brand reputation under pressure."
+            ]
+          }
+        },
+        {
+          "title": "Performance Marketing Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you structure experiments for paid acquisition campaigns?",
+              "What would you inspect when CAC rises but conversion rate looks stable?"
+            ],
+            "Case Study": [
+              "A paid channel spends its budget quickly with poor lead quality. What changes would you test first?"
+            ],
+            "Behavioral": [
+              "Describe a time you stopped or changed a campaign despite sunk effort."
+            ]
+          }
+        },
+        {
+          "title": "Email Marketing Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you segment email audiences and personalize campaigns responsibly?",
+              "What factors affect deliverability, open rate, click rate, and conversion?"
+            ],
+            "Case Study": [
+              "An email campaign has strong opens but weak clicks. How would you improve it?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you improved retention or conversion through email."
+            ]
+          }
+        },
+        {
+          "title": "Brand Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you maintain brand consistency while adapting to different channels and audiences?",
+              "What research would you use to evaluate brand perception?"
+            ],
+            "Case Study": [
+              "A product launch gets attention but the message is misunderstood. How would you correct it?"
+            ],
+            "Behavioral": [
+              "Describe a time you defended brand quality while collaborating with sales or product."
+            ]
+          }
+        },
+        {
+          "title": "Product Marketing Manager",
+          "questions": {
+            "Role Specific": [
+              "How would you define positioning and messaging for a new product feature?",
+              "What inputs do you need from customers, sales, product, and competitors before launch?"
+            ],
+            "Case Study": [
+              "Sales says prospects do not understand the product value. How would you refine messaging?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you aligned cross-functional teams for a launch."
+            ]
+          }
+        },
+        {
+          "title": "Market Research Analyst",
+          "questions": {
+            "Role Specific": [
+              "How would you design research to understand a new customer segment?",
+              "What makes survey results reliable enough to guide strategy?"
+            ],
+            "Case Study": [
+              "Leadership wants to enter a new market with limited data. How would you size the opportunity?"
+            ],
+            "Behavioral": [
+              "Describe a time your research challenged an assumption."
+            ]
+          }
+        },
+        {
+          "title": "PR and Communications Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you prepare messaging for a company announcement with multiple stakeholders?",
+              "What is your approach to media relationships and response planning?"
+            ],
+            "Case Study": [
+              "A customer issue becomes public on social media. How would you coordinate communications?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you communicated clearly in a high-pressure situation."
+            ]
+          }
+        },
+        {
+          "title": "Growth Marketing Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you identify growth opportunities across acquisition, activation, retention, and referral?",
+              "What experiment design helps you separate signal from noise?"
+            ],
+            "Case Study": [
+              "Signup volume is healthy, but activation is low. How would you investigate and prioritize experiments?"
+            ],
+            "Behavioral": [
+              "Describe a time you learned from an experiment that did not win."
+            ]
+          }
+        },
+        {
+          "title": "Event Marketing Specialist",
+          "questions": {
+            "Role Specific": [
+              "How do you plan an event campaign from audience targeting to post-event follow-up?",
+              "What metrics would you use to judge event ROI?"
+            ],
+            "Case Study": [
+              "A major speaker cancels shortly before an event. How would you adjust the plan?"
+            ],
+            "Behavioral": [
+              "Tell me about a time you handled event logistics under pressure."
+            ]
+          }
+        },
+        {
+          "title": "Marketing Manager",
+          "questions": {
+            "Role Specific": [
+              "How do you set marketing priorities when brand, demand generation, and sales needs compete?",
+              "What operating rhythm keeps marketing plans tied to business outcomes?"
+            ],
+            "Case Study": [
+              "Pipeline contribution is below target midway through the quarter. How would you respond?"
+            ],
+            "Behavioral": [
+              "Describe a time you coached a marketing team through an underperforming campaign."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

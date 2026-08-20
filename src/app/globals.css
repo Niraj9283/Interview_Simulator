@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --background: #160728;
+  --foreground: #f8f7ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: radial-gradient(circle at 20% 55%, rgba(194, 24, 127, 0.18), transparent 38%),
+    radial-gradient(circle at 78% 18%, rgba(92, 39, 137, 0.2), transparent 35%),
+    linear-gradient(135deg, #1b0734 0%, #241044 48%, var(--background) 100%);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  isolation: isolate;
+}
+
+.interactive-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  filter: saturate(1.18) contrast(1.05);
+  opacity: 1;
+}
+
+body > main {
+  position: relative;
+  z-index: 1;
+}
+
+.interview-shell[data-panel-theme="dark"] .bg-white,
+.interview-shell[data-panel-theme="dark"] .bg-white\/92,
+.interview-shell[data-panel-theme="dark"] .bg-zinc-50,
+.interview-shell[data-panel-theme="dark"] .bg-zinc-100,
+.interview-shell[data-panel-theme="dark"] .bg-\[\#fbfcfa\] {
+  background-color: rgba(25, 10, 46, 0.92) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .border-zinc-200,
+.interview-shell[data-panel-theme="dark"] .border-zinc-300 {
+  border-color: rgba(217, 70, 239, 0.28) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .border-dashed {
+  border-color: rgba(244, 114, 182, 0.34) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] input:not([type="file"]),
+.interview-shell[data-panel-theme="dark"] select,
+.interview-shell[data-panel-theme="dark"] textarea {
+  background-color: rgba(17, 6, 34, 0.88) !important;
+  border-color: rgba(217, 70, 239, 0.3) !important;
+  color: #fbf7ff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] input::placeholder,
+.interview-shell[data-panel-theme="dark"] textarea::placeholder {
+  color: rgba(250, 232, 255, 0.52) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] select option {
+  background-color: #190a2e;
+  color: #fbf7ff;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-950,
+.interview-shell[data-panel-theme="dark"] .text-zinc-900,
+.interview-shell[data-panel-theme="dark"] .text-zinc-800,
+.interview-shell[data-panel-theme="dark"] .text-zinc-700 {
+  color: #fbf7ff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-600,
+.interview-shell[data-panel-theme="dark"] .text-zinc-500 {
+  color: rgba(250, 232, 255, 0.72) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .bg-zinc-200 {
+  background-color: rgba(113, 63, 140, 0.55) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .shadow-sm {
+  box-shadow: 0 0 26px rgba(236, 72, 153, 0.12) !important;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
