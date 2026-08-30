@@ -2,6 +2,24 @@ import rawRoleDatabase from "../../data/interview-role-database.json";
 
 export type DepartmentId = "Technical" | "Finance" | "HR" | "Marketing";
 
+export type InterviewType = "General" | "HR" | "Technical" | "Coding" | "System Design" | "Behavioral";
+
+export const INTERVIEW_TYPES: InterviewType[] = [
+  "General",
+  "HR",
+  "Technical",
+  "Coding",
+  "System Design",
+  "Behavioral",
+];
+
+export function isInterviewTypeAvailableForDepartment(departmentId: DepartmentId, type: InterviewType): boolean {
+  if (type === "Coding") {
+    return departmentId === "Technical";
+  }
+  return true;
+}
+
 export type InterviewTrack = "Role Specific" | "DSA" | "System Design" | "Case Study" | "Behavioral";
 
 export type RoleQuestionBank = Partial<Record<InterviewTrack, string[]>>;

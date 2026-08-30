@@ -40,6 +40,13 @@ next-dev*.log
 # python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+backend/data/
+*.sqlite3
 
 
 # vercel
