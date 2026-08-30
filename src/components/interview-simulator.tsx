@@ -2953,64 +2953,45 @@ export default function InterviewSimulator() {
           </section>
 
           <aside className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
-            {/* Tab Navigation for Sidebar */}
-            <div className="flex border-b border-zinc-200 bg-zinc-50 rounded-md p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => setSidebarTab("scorecard")}
-                className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                  sidebarTab === "scorecard"
-                    ? "bg-white text-zinc-900 shadow-xs border border-zinc-200"
-                    : "text-zinc-500 hover:text-zinc-800"
-                }`}
-              >
-                <Gauge size={13} />
-                Scorecard
-              </button>
-              <button
-                type="button"
-                onClick={() => setSidebarTab("memory")}
-                className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                  sidebarTab === "memory"
-                    ? "bg-white text-zinc-900 shadow-xs border border-zinc-200"
-                    : "text-zinc-500 hover:text-zinc-800"
-                }`}
-              >
-                <BrainCircuit size={13} />
-                Memory
-                {sessionMemory.claims.length > 0 && (
-                  <span className="rounded-full bg-fuchsia-100 px-1.5 py-0.2 text-[9px] font-bold text-fuchsia-900">
-                    {sessionMemory.claims.length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSidebarTab("skills")}
-                className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                  sidebarTab === "skills"
-                    ? "bg-white text-zinc-900 shadow-xs border border-zinc-200"
-                    : "text-zinc-500 hover:text-zinc-800"
-                }`}
-              >
-                <Target size={13} />
-                Skills
-              </button>
-              <button
-                type="button"
-                onClick={() => setSidebarTab("integrity")}
-                className={`flex-1 py-1.5 px-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                  sidebarTab === "integrity"
-                    ? "bg-white text-zinc-900 shadow-xs border border-zinc-200"
-                    : "text-zinc-500 hover:text-zinc-800"
-                }`}
-              >
-                <ShieldCheck size={13} className={integrityState.integrityScore < 75 ? "text-amber-600" : "text-emerald-600"} />
-                Integrity
-                <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold ${integrityState.integrityScore >= 85 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                  {integrityState.integrityScore}%
-                </span>
-              </button>
+            {/* Tab Navigation for Sidebar - Spacious 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-zinc-200/90 bg-zinc-100/90 p-1.5 shadow-2xs">
+              {[
+                { id: "scorecard", label: "Scorecard", icon: Gauge, badge: completedQuestions > 0 ? `${completedQuestions}` : null, tone: "text-emerald-600" },
+                { id: "memory", label: "Memory", icon: BrainCircuit, badge: sessionMemory.claims.length > 0 ? `${sessionMemory.claims.length}` : null, tone: "text-fuchsia-600" },
+                { id: "skills", label: "Skills", icon: Target, badge: activeSkillGapReport ? `${activeSkillGapReport.skills.length}` : null, tone: "text-indigo-600" },
+                { id: "integrity", label: "Integrity", icon: ShieldCheck, badge: `${integrityState.integrityScore}%`, tone: integrityState.integrityScore >= 85 ? "text-emerald-600" : "text-amber-600" },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = sidebarTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSidebarTab(tab.id as typeof sidebarTab)}
+                    className={`flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
+                      isActive
+                        ? "bg-white text-zinc-950 shadow-xs border border-zinc-200/90 ring-1 ring-black/5"
+                        : "text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Icon size={14} className={isActive ? tab.tone : "text-zinc-400"} />
+                      <span className="truncate">{tab.label}</span>
+                    </span>
+                    {tab.badge && (
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.2 text-[9.5px] font-mono font-bold ${
+                          isActive
+                            ? "bg-zinc-100 text-zinc-800 border border-zinc-200"
+                            : "bg-zinc-200/80 text-zinc-600"
+                        }`}
+                      >
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* TAB 1: SCORECARD & SIGNALS */}
