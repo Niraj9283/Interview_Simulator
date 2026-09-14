@@ -225,6 +225,68 @@ export const SYSTEM_DESIGN_CHALLENGES: SystemDesignChallenge[] = [
     },
     expectedComponents: ["cdn", "load_balancer", "app_server", "cache", "primary_db", "message_queue"],
   },
+  {
+    id: "youtube-streaming",
+    title: "Design YouTube (Global Video Streaming Platform)",
+    category: "High-Volume Video Ingestion & Delivery",
+    targetScale: "2 Billion Monthly Users / 500 Hours Video Uploaded per Minute",
+    prompt: "Design an end-to-end video streaming platform handling video upload, asynchronous transcoding into multiple bitrates (1080p, 720p, 480p), adaptive bitrate streaming (HLS/DASH), and video metadata search.",
+    requirements: {
+      functional: [
+        "Users can upload videos up to 4K resolution.",
+        "Asynchronous distributed transcoding pipeline with priority queues.",
+        "Global video streaming with adaptive bitrate streaming (HLS/DASH).",
+        "Video metadata and view count tracking.",
+      ],
+      nonFunctional: [
+        "Sub-200ms initial video playback start latency via CDN edge caching.",
+        "High durability (99.999999999%) for original video files in Object Storage.",
+        "Fault-tolerant transcoding workers with retry queues.",
+      ],
+    },
+    expectedComponents: ["cdn", "load_balancer", "api_gateway", "app_server", "message_queue", "object_storage", "primary_db", "cache", "search_index"],
+  },
+  {
+    id: "whatsapp-chat",
+    title: "Design WhatsApp (Real-Time Messaging at Scale)",
+    category: "Low-Latency Real-Time Communication",
+    targetScale: "2 Billion Active Users / 100 Billion Messages Daily",
+    prompt: "Design a real-time 1-on-1 and group messaging system supporting end-to-end encrypted chat, user online presence, and offline message queueing with sub-100ms delivery.",
+    requirements: {
+      functional: [
+        "Real-time 1-on-1 and group messaging with delivery receipts (Sent, Delivered, Read).",
+        "User online presence detection (Online / Last Seen).",
+        "Offline message storage and replay upon user reconnection.",
+      ],
+      nonFunctional: [
+        "End-to-end message latency < 100ms worldwide.",
+        "Persistent bidirectional connections via WebSocket / TCP Gateway.",
+        "Horizontally partitioned message database handling 1M+ write IOPS.",
+      ],
+    },
+    expectedComponents: ["load_balancer", "api_gateway", "app_server", "message_queue", "cache", "primary_db", "read_replica"],
+  },
+  {
+    id: "food-delivery",
+    title: "Design a Food Delivery Platform (DoorDash / UberEats)",
+    category: "Geospatial Matching & Stateful Order Workflow",
+    targetScale: "5 Million Daily Orders / 250,000 Active Couriers",
+    prompt: "Design a distributed food delivery system coordinating restaurant menus, real-time driver geospatial tracking, matching algorithm, order lifecycle state machines, and customer notifications.",
+    requirements: {
+      functional: [
+        "Customers browse menus, place orders, and track delivery in real time.",
+        "Couriers broadcast GPS location every 3-5 seconds.",
+        "Spatial dispatch engine matches nearest available courier to ready orders.",
+        "Order state machine: Placed -> Accepted -> Preparing -> Picked Up -> Delivered.",
+      ],
+      nonFunctional: [
+        "Sub-second geospatial radius queries using Geohashing / QuadTrees.",
+        "Strict consistency for order payment and inventory states.",
+        "High availability with read replicas for catalog browsing.",
+      ],
+    },
+    expectedComponents: ["cdn", "load_balancer", "api_gateway", "app_server", "cache", "message_queue", "primary_db", "read_replica"],
+  },
 ];
 
 export const ARCHITECTURE_PRESETS: {

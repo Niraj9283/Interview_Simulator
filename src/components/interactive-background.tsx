@@ -65,10 +65,12 @@ function usePrefersReducedMotion() {
   return ref;
 }
 
-function buildParticles(width: number, height: number) {
+function buildParticles(width: number, height: number, isMobile = false) {
   const random = createRandom(20260521);
-  const count = Math.round(Math.min(145, Math.max(72, (width * height) / 11800)));
-  const clusterCount = 7;
+  const maxCap = isMobile ? 40 : 145;
+  const minCap = isMobile ? 22 : 72;
+  const count = Math.round(Math.min(maxCap, Math.max(minCap, (width * height) / (isMobile ? 18000 : 11800))));
+  const clusterCount = isMobile ? 4 : 7;
   const clusters = Array.from({ length: clusterCount }, () => ({
     x: random() * width,
     y: random() * height,
@@ -113,7 +115,11 @@ export default function InteractiveBackground() {
 
     const activeCanvas = canvas;
     const ctx = context;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const isMobile =
+      typeof window !== "undefined" &&
+      (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        window.innerWidth <= 768);
+    const dpr = isMobile ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const pointer: Pointer = { x: 0, y: 0, active: false };
     const state = { width: 0, height: 0, time: 0 };
 
@@ -125,7 +131,7 @@ export default function InteractiveBackground() {
       activeCanvas.style.width = `${state.width}px`;
       activeCanvas.style.height = `${state.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      particlesRef.current = buildParticles(state.width, state.height);
+      particlesRef.current = buildParticles(state.width, state.height, isMobile);
       backgroundRef.current = buildBackgroundCache(state.width, state.height, dpr);
     }
 
@@ -260,8 +266,10 @@ export default function InteractiveBackground() {
       }
 
       ctx.lineWidth = 1;
-      ctx.shadowColor = "rgba(255, 44, 150, 0.35)";
-      ctx.shadowBlur = 5;
+      if (!isMobile) {
+        ctx.shadowColor = "rgba(255, 44, 150, 0.35)";
+        ctx.shadowBlur = 5;
+      }
 
       for (let i = 0; i < particles.length; i += 1) {
         const particle = particles[i];
@@ -316,7 +324,9 @@ export default function InteractiveBackground() {
         }
       }
 
-      ctx.shadowBlur = 10;
+      if (!isMobile) {
+        ctx.shadowBlur = 10;
+      }
 
       for (const particle of particles) {
         const pulse = 0.72 + Math.sin(state.time * 0.035 + particle.phase) * 0.28;
@@ -326,10 +336,18 @@ export default function InteractiveBackground() {
         ctx.fill();
       }
 
-      ctx.shadowBlur = 0;
+      if (!isMobile) {
+        ctx.shadowBlur = 0;
+      }
     }
 
-    function paint() {
+    let lastPaint = 0;
+    function paint(now: number) {
+      if (isMobile && now - lastPaint < 32) {
+        frameRef.current = window.requestAnimationFrame(paint);
+        return;
+      }
+      lastPaint = now;
       state.time += 1;
       const background = backgroundRef.current;
 

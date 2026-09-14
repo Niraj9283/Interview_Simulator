@@ -6,6 +6,8 @@
  * 3. technical_knowledge (Deep technical concepts & rubrics: Python, ML, DL, RAG, LLMs, SQL)
  */
 
+import { extractTextFromDocx } from "./docx-extractor";
+
 export interface RAGMatch {
   id: string;
   document: string;
@@ -94,7 +96,15 @@ export async function uploadResumeRAG(file: File | null, rawText?: string): Prom
   }
 
   // Client-side fallback extraction
-  const text = rawText || (file ? await file.text() : "");
+  let text = rawText || "";
+  if (!text && file) {
+    const nameLower = file.name.toLowerCase();
+    if (nameLower.endsWith(".docx")) {
+      text = await extractTextFromDocx(file);
+    } else {
+      text = await file.text();
+    }
+  }
   const extractedSkills = extractSkillsFromResume(text);
 
   return {

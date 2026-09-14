@@ -164,32 +164,51 @@ export class VoiceAnalyzer {
     this.isCurrentlySpeaking = false;
     this.smoothedEnergy = 0;
 
+    const isMobile =
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0));
+    const targetInterval = isMobile ? 95 : 65; // ~10 FPS mobile, ~15 FPS desktop
+
+    let lastTickTime = 0;
+    let lastPitchTime = 0;
+    let cachedPitch: number | undefined = undefined;
+
     const tick = () => {
       if (!this.analyser || !this.timeDomainBuffer) return;
+
+      const now = performance.now();
+      if (now - lastTickTime < targetInterval) {
+        this.animFrameId = window.requestAnimationFrame(tick);
+        return;
+      }
+      lastTickTime = now;
 
       this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
 
       // 1. Calculate RMS from Time-Domain Samples: sqrt( sum(s_i^2) / N )
       let sumSquares = 0;
       const bufferLength = this.timeDomainBuffer.length;
-      for (let i = 0; i < bufferLength; i++) {
+      // Step sample by 2 on mobile to cut float multiplications in half
+      const step = isMobile ? 2 : 1;
+      let samplesProcessed = 0;
+      for (let i = 0; i < bufferLength; i += step) {
         const sample = this.timeDomainBuffer[i];
         sumSquares += sample * sample;
+        samplesProcessed++;
       }
-      const rms = Math.sqrt(sumSquares / bufferLength);
+      const rms = Math.sqrt(sumSquares / samplesProcessed);
 
       // 2. Convert RMS to Decibels: 20 * log10(RMS)
       const db = rms > 0.00001 ? 20 * Math.log10(rms) : -100;
 
       // 3. Map dB to Normalized 0 - 100 Voice Energy
-      // Typical conversational range: noiseFloorDb (-52 dB) to peakSpeechDb (-10 dB)
       let instantEnergy = 0;
       if (db > this.noiseFloorDb) {
         instantEnergy = ((db - this.noiseFloorDb) / (this.peakSpeechDb - this.noiseFloorDb)) * 100;
       }
       instantEnergy = clamp(instantEnergy, 0, 100);
 
-      // Smooth energy with attack/decay filter (faster attack, smooth decay)
+      // Smooth energy with attack/decay filter
       if (instantEnergy > this.smoothedEnergy) {
         this.smoothedEnergy = this.smoothedEnergy * 0.4 + instantEnergy * 0.6;
       } else {
@@ -199,9 +218,7 @@ export class VoiceAnalyzer {
       const displayEnergy = Math.round(this.smoothedEnergy);
       const isSpeaking = displayEnergy >= 18;
 
-      let detectedPitch: number | undefined = undefined;
-
-      // Track speech cadence & burst patterns for realistic pace & steadiness
+      // Track speech cadence & burst patterns
       if (isSpeaking) {
         this.currentBurstFrames++;
         if (this.currentPauseFrames > 0) {
@@ -210,14 +227,20 @@ export class VoiceAnalyzer {
         this.isCurrentlySpeaking = true;
         this.turnEnergySamples.push(displayEnergy);
         this.speechEnvelopeHistory.push(displayEnergy);
-        if (this.speechEnvelopeHistory.length > 60) {
+        if (this.speechEnvelopeHistory.length > 40) {
           this.speechEnvelopeHistory.shift();
         }
 
-        const pitch = autoCorrelatePitch(this.timeDomainBuffer, this.audioContext?.sampleRate || 44100);
-        if (pitch > 0) {
-          detectedPitch = pitch;
-          this.turnPitchSamples.push(pitch);
+        // Throttle pitch autocorrelation: only run once every 160ms when speaking
+        if (now - lastPitchTime >= 160) {
+          lastPitchTime = now;
+          const pitch = autoCorrelatePitch(this.timeDomainBuffer, this.audioContext?.sampleRate || 44100);
+          if (pitch > 0) {
+            cachedPitch = pitch;
+            this.turnPitchSamples.push(pitch);
+          } else {
+            cachedPitch = undefined;
+          }
         }
       } else {
         this.currentPauseFrames++;
@@ -226,11 +249,12 @@ export class VoiceAnalyzer {
           this.currentBurstFrames = 0;
         }
         this.isCurrentlySpeaking = false;
+        cachedPitch = undefined;
       }
 
-      // Calculate real-time steadiness: low variance in active speech envelope
+      // Calculate real-time steadiness
       let steadiness = 72;
-      if (this.speechEnvelopeHistory.length >= 10) {
+      if (this.speechEnvelopeHistory.length >= 8) {
         const avg =
           this.speechEnvelopeHistory.reduce((a, b) => a + b, 0) / this.speechEnvelopeHistory.length;
         const variance =
@@ -239,18 +263,17 @@ export class VoiceAnalyzer {
         steadiness = clamp(Math.round(95 - variance * 1.6), 35, 98);
       }
 
-      // Calculate real-time cadence pace: based on burst/pause ratios (0 if no speech yet)
+      // Calculate real-time cadence pace
       let pace = 0;
       if (this.speechBurstDurations.length >= 3) {
-        const recentBursts = this.speechBurstDurations.slice(-8);
+        const recentBursts = this.speechBurstDurations.slice(-6);
         const avgBurst = recentBursts.reduce((a, b) => a + b, 0) / recentBursts.length;
-        // Ideal speech burst is ~15-45 frames (0.25s - 0.75s per syllable group/phrase)
-        if (avgBurst >= 12 && avgBurst <= 50) {
-          pace = clamp(Math.round(60 + (avgBurst / 50) * 25), 45, 92);
-        } else if (avgBurst < 12) {
-          pace = 48; // Too fast / staccato
+        if (avgBurst >= 8 && avgBurst <= 40) {
+          pace = clamp(Math.round(60 + (avgBurst / 40) * 25), 45, 92);
+        } else if (avgBurst < 8) {
+          pace = 48;
         } else {
-          pace = 54; // Too drawn out
+          pace = 54;
         }
       }
 
@@ -258,7 +281,7 @@ export class VoiceAnalyzer {
         energy: displayEnergy,
         db: Number(db.toFixed(1)),
         rms: Number(rms.toFixed(4)),
-        pitchHz: detectedPitch,
+        pitchHz: cachedPitch,
         isSpeaking,
         pace,
         steadiness,

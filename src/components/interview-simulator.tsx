@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Code2,
   Cpu,
@@ -137,6 +138,34 @@ import {
   normalizeTechnicalTranscript,
   packageVoiceAnswer,
 } from "@/lib/voice-answer-engine";
+import { CiuKnowledgeGraphModal } from "./ciu-knowledge-graph-modal";
+import { CandidateSkillGraphModal } from "./candidate-skill-graph-modal";
+import { InterviewReadinessModal } from "./interview-readiness-modal";
+import { MultiAspectScorecard } from "./multi-aspect-scorecard";
+import { CIU_KNOWLEDGE_GRAPH, CIUTopicNode, getTopicById } from "@/lib/knowledge-graph";
+import { CandidateSkillGraph, generateCandidateSkillGraph } from "@/lib/resume-skill-graph";
+import {
+  COMPANY_PROFILES,
+  EXPERIENCE_LEVELS,
+  ExperienceLevel,
+  PLATFORM_INTERVIEW_MODES,
+  PlatformInterviewMode,
+  TARGET_COMPANIES,
+  TARGET_ROLES,
+  TargetCompany,
+  TargetRole,
+  getCompanyTailoredQuestions,
+} from "@/lib/company-interview-profiles";
+import { ComprehensiveEvaluationResult, evaluateAnswerMultiAspect } from "@/lib/multi-evaluator";
+import { ConfidenceCalibrationResult, computeConfidenceCalibration } from "@/lib/confidence-calibration";
+import {
+  ReadinessProgressSummary,
+  StoredInterviewSession,
+  computeReadinessProgress,
+  loadInterviewHistory,
+  saveInterviewSession,
+} from "@/lib/interview-history";
+import { getNextInterviewQuestion } from "@/lib/question-service";
 
 type Stage = "setup" | "live" | "complete";
 type PanelTheme = "light" | "dark";
@@ -168,8 +197,7 @@ const initialProfile: CandidateProfile = {
     enableInterruptions: true,
     enableTimePressureClock: true,
   },
-  resumeText:
-    "Project: Thyroid Disease Prediction using Random Forest, SHAP, and Streamlit, handling severe class imbalance.\nProject: Network Intrusion Detection System using Python, XGBoost, and Scikit-Learn for anomaly classification.\nSkills: Python, Random Forest, SHAP, Machine Learning, Deep Learning, SQL, FastAPI, Docker, PyTorch.",
+  resumeText: "",
 };
 
 const domainIcons: Record<InterviewDomain, typeof Users> = {
@@ -196,7 +224,7 @@ const DEFAULT_WEATHER_LOCATION = {
 export default function InterviewSimulator() {
   const [profile, setProfile] = useState<CandidateProfile>(initialProfile);
   const [panelTheme, setPanelTheme] = useState<PanelTheme>("light");
-  const [resumeFileName, setResumeFileName] = useState("sample-profile.txt");
+  const [resumeFileName, setResumeFileName] = useState("");
   const [stage, setStage] = useState<Stage>("setup");
   const [questions, setQuestions] = useState<string[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -285,6 +313,26 @@ export default function InterviewSimulator() {
   const [pendingAttempt1, setPendingAttempt1] = useState<InterviewAttempt | null>(null);
   const [activeABComparison, setActiveABComparison] = useState<ABComparisonResult | null>(null);
   const [showABModal, setShowABModal] = useState(false);
+  // CIU Intelligence Layer & Platform Enhancements
+  const [showCiuGraphModal, setShowCiuGraphModal] = useState(false);
+  const [showSkillGraphModal, setShowSkillGraphModal] = useState(false);
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const toolsDropdownRef = useRef<HTMLDivElement>(null);
+  const [targetCompany, setTargetCompany] = useState<TargetCompany>("Google");
+  const [targetCompanyEnabled, setTargetCompanyEnabled] = useState(false);
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("0-2 years");
+  const [platformMode, setPlatformMode] = useState<PlatformInterviewMode>("Technical Interview");
+  const isResumeUploaded = Boolean(profile.resumeText && profile.resumeText.trim().length > 30);
+  const [candidateSkillGraph, setCandidateSkillGraph] = useState<CandidateSkillGraph>(() =>
+    generateCandidateSkillGraph(initialProfile.resumeText, initialProfile.name)
+  );
+  const [storedSessions, setStoredSessions] = useState<StoredInterviewSession[]>([]);
+  const [readinessSummary, setReadinessSummary] = useState<ReadinessProgressSummary>(() =>
+    computeReadinessProgress([])
+  );
+  const [latestMultiEvaluation, setLatestMultiEvaluation] = useState<ComprehensiveEvaluationResult | null>(null);
+  const [latestCalibration, setLatestCalibration] = useState<ConfidenceCalibrationResult | null>(null);
   const integrityTrackerRef = useRef<InterviewIntegrityTracker | null>(null);
   const [integrityState, setIntegrityState] = useState<IntegrityState>({
     singlePersonDetected: true,
@@ -372,7 +420,34 @@ export default function InterviewSimulator() {
 
   useEffect(() => {
     getRAGStatus().then((status) => setRagStatus(status));
+    const hist = loadInterviewHistory();
+    setStoredSessions(hist);
+    setReadinessSummary(computeReadinessProgress(hist));
   }, []);
+
+  useEffect(() => {
+    if (profile.resumeText) {
+      const graph = generateCandidateSkillGraph(profile.resumeText, profile.name);
+      setCandidateSkillGraph(graph);
+    }
+  }, [profile.resumeText, profile.name]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        toolsDropdownRef.current &&
+        !toolsDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowToolsDropdown(false);
+      }
+    }
+    if (showToolsDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showToolsDropdown]);
 
   useEffect(() => {
     if (stage === "live" && currentQuestion) {
@@ -493,10 +568,12 @@ export default function InterviewSimulator() {
       if (isCancelled || !ready) return;
 
       if (videoRef.current) {
+        let lastEyeDispatch = 0;
+        let lastScore = -1;
+        let lastStatus = "";
+
         tracker.start(videoRef.current, (result) => {
           if (!isCancelled) {
-            setEyeContact(result.score);
-            setEyeContactResult(result);
             if (integrityTrackerRef.current) {
               integrityTrackerRef.current.updateFaceTelemetry(
                 result.facesCount,
@@ -504,7 +581,17 @@ export default function InterviewSimulator() {
                 result.headPose.pitch,
                 result.headPose.yaw
               );
-              setIntegrityState(integrityTrackerRef.current.getState());
+            }
+            // Throttle React state updates to avoid continuous 60fps re-rendering of entire component
+            const now = performance.now();
+            const scoreChanged = Math.abs(result.score - lastScore) >= 3;
+            const statusChanged = result.cameraEngagementLevel !== lastStatus;
+            if ((scoreChanged || statusChanged || now - lastEyeDispatch > 250) && now - lastEyeDispatch > 110) {
+              lastEyeDispatch = now;
+              lastScore = result.score;
+              lastStatus = result.cameraEngagementLevel;
+              setEyeContact(result.score);
+              setEyeContactResult(result);
             }
           }
         });
@@ -520,7 +607,13 @@ export default function InterviewSimulator() {
   }, [cameraEnabled]);
 
   function updateProfile<K extends keyof CandidateProfile>(key: K, value: CandidateProfile[K]) {
-    setProfile((current) => ({ ...current, [key]: value }));
+    setProfile((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "resumeText" || key === "name") {
+        setCandidateSkillGraph(generateCandidateSkillGraph(next.resumeText, next.name));
+      }
+      return next;
+    });
   }
 
   function handleDepartmentChange(department: DepartmentId) {
@@ -614,6 +707,12 @@ export default function InterviewSimulator() {
     }
   }
 
+  function clearResume() {
+    setResumeFileName("");
+    updateProfile("resumeText", "");
+    setCandidateSkillGraph(generateCandidateSkillGraph("", profile.name));
+  }
+
   async function toggleCamera() {
     if (cameraEnabled) {
       stopCamera();
@@ -628,8 +727,18 @@ export default function InterviewSimulator() {
     }
 
     try {
+      const isMobile =
+        typeof window !== "undefined" &&
+        (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          window.innerWidth <= 768);
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: "user",
+          width: { ideal: isMobile ? 480 : 640, max: isMobile ? 640 : 1280 },
+          height: { ideal: isMobile ? 360 : 480, max: isMobile ? 480 : 720 },
+          frameRate: { ideal: isMobile ? 20 : 24, max: 30 },
+        },
       });
       videoStreamRef.current = stream;
 
@@ -688,9 +797,18 @@ export default function InterviewSimulator() {
         voiceAnalyzerRef.current = new VoiceAnalyzer();
       }
 
+      let lastVoiceDispatch = 0;
+      let lastEnergy = -1;
+
       voiceAnalyzerRef.current.start(stream, (signal) => {
-        setVoiceSignal(signal);
         speechTrackerRef.current?.updateVoiceActivity(signal.isSpeaking);
+        const now = performance.now();
+        const energyChanged = Math.abs(signal.energy - lastEnergy) >= 3;
+        if ((energyChanged || now - lastVoiceDispatch > 220) && now - lastVoiceDispatch > 85) {
+          lastVoiceDispatch = now;
+          lastEnergy = signal.energy;
+          setVoiceSignal(signal);
+        }
       });
 
       setMicEnabled(true);
@@ -808,7 +926,14 @@ export default function InterviewSimulator() {
       ...profile,
       digitalProfile,
     };
-    const firstQuestion = generateQuestion(effectiveProfile, 0, keywords, undefined, profile.difficulty);
+    const firstQuestion = getNextInterviewQuestion({
+      profile: effectiveProfile,
+      turnIndex: 0,
+      targetCompany,
+      targetCompanyEnabled,
+      experienceLevel,
+      sessionAskedQuestions: [],
+    });
 
     voiceAnalyzerRef.current?.resetTurnStats();
     speechTrackerRef.current?.reset();
@@ -937,6 +1062,21 @@ export default function InterviewSimulator() {
     }
 
     const latencyMs = Math.max(0, Math.round(performance.now() - questionStartedAt));
+
+    // Multi-Aspect Intelligent Evaluation (6 Independent Evaluators + Score Explanation + Calibration)
+    const multiAspectResult = evaluateAnswerMultiAspect(currentQuestion, trimmedAnswer, {
+      eyeContact: eyeContactResult?.score ?? eyeContact,
+      wpm: speechState.wpm,
+      fillerWords: speechState.totalFillers,
+      volumeConsistency: voiceSignal.steadiness,
+    });
+    const confidenceCalibration = computeConfidenceCalibration(
+      multiAspectResult.scores.confidenceScore,
+      multiAspectResult.scores.technicalScore
+    );
+    setLatestMultiEvaluation(multiAspectResult);
+    setLatestCalibration(confidenceCalibration);
+
     const nextTurn: InterviewTurn = {
       id: history.length + 1,
       question: currentQuestion,
@@ -975,6 +1115,36 @@ export default function InterviewSimulator() {
       setSessionSkillDeltas(skillDeltas);
       const bench = computeSessionBenchmark(nextHistory, profile, updatedProfile);
       setActiveBenchmark(bench);
+
+      // Persist session to history and update readiness summary
+      const storedSession: StoredInterviewSession = {
+        id: `session_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        candidateName: profile.name,
+        targetCompany: targetCompanyEnabled ? targetCompany : "General Industry",
+        targetRole: profile.targetRole,
+        interviewMode: platformMode,
+        experienceLevel: experienceLevel,
+        overallScore: averageScore(nextHistory),
+        evaluatorScores: multiAspectResult.scores,
+        domainReadiness: {
+          dsa: Math.min(100, Math.max(30, multiAspectResult.scores.technicalScore + 5)),
+          dbms: Math.min(100, Math.max(30, multiAspectResult.scores.technicalScore - 5)),
+          os: Math.min(100, Math.max(25, multiAspectResult.scores.problemSolvingScore - 10)),
+          networking: Math.min(100, Math.max(30, multiAspectResult.scores.relevanceScore)),
+          systemDesign: Math.min(100, Math.max(25, multiAspectResult.scores.problemSolvingScore)),
+          communication: multiAspectResult.scores.communicationScore,
+        },
+        questionsCount: nextHistory.length,
+        weakAreas: nextHistory.map((t) => t.weakArea).filter((w): w is string => Boolean(w)),
+        confidenceCalibration,
+        roadmap: generate7DayRoadmap(nextHistory, profile.targetRole),
+      };
+      saveInterviewSession(storedSession);
+      const updatedHist = loadInterviewHistory();
+      setStoredSessions(updatedHist);
+      setReadinessSummary(computeReadinessProgress(updatedHist));
+
       setStage("complete");
       setIsRecording(false);
       return;
@@ -984,14 +1154,15 @@ export default function InterviewSimulator() {
       ...profile,
       digitalProfile,
     };
-    const nextQuestion = generateQuestion(
-      effectiveProfile,
-      nextHistory.length,
-      keywords,
-      nextTurn,
-      nextDiff,
-      updatedMem
-    );
+    const nextQuestion = getNextInterviewQuestion({
+      profile: effectiveProfile,
+      turnIndex: nextHistory.length,
+      lastTurn: nextTurn,
+      targetCompany,
+      targetCompanyEnabled,
+      experienceLevel,
+      sessionAskedQuestions: nextHistory.map((t) => t.question),
+    });
     setQuestions((current) => [...current, nextQuestion]);
     setQuestionIndex(nextHistory.length);
     setQuestionStartedAt(performance.now());
@@ -1058,14 +1229,15 @@ export default function InterviewSimulator() {
       return;
     }
 
-    const nextQuestion = generateQuestion(
+    const nextQuestion = getNextInterviewQuestion({
       profile,
-      nextHistory.length,
-      keywords,
-      nextTurn,
-      dynamicDifficulty,
-      sessionMemory
-    );
+      turnIndex: nextHistory.length,
+      lastTurn: nextTurn,
+      targetCompany,
+      targetCompanyEnabled,
+      experienceLevel,
+      sessionAskedQuestions: nextHistory.map((t) => t.question),
+    });
     setQuestions((current) => [...current, nextQuestion]);
     setQuestionIndex(nextHistory.length);
     setQuestionStartedAt(performance.now());
@@ -1179,93 +1351,306 @@ export default function InterviewSimulator() {
 
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-4 px-4 py-4 lg:px-6">
         <header className="flex flex-col gap-3 border-b border-fuchsia-400/20 pb-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-md bg-zinc-950 text-white">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-md bg-zinc-950 text-white shadow-[0_0_24px_rgba(236,72,153,0.25)] border border-fuchsia-500/30">
               <BrainCircuit size={24} strokeWidth={1.8} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-normal text-white">MockMate AI</h1>
               <p className="text-sm text-fuchsia-100/80">Real-time interview simulator</p>
             </div>
-          </div>
-          <div className="flex flex-col gap-2 lg:items-end">
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <EdgeModeToggle mode={executionMode} onModeChange={setExecutionMode} />
+
+            {/* Platform Dropdown Menu in Top-Left Corner with App-Suited Icon */}
+            <div className="relative ml-1 sm:ml-3" ref={toolsDropdownRef}>
               <button
                 type="button"
-                onClick={() => setShowEdgeModal(true)}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60"
-                title="Inspect Edge AI Architecture & Topology"
+                onClick={() => setShowToolsDropdown((prev) => !prev)}
+                className="flex h-11 items-center gap-2.5 rounded-lg border border-fuchsia-400/30 bg-[#241044]/90 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.2)] backdrop-blur transition hover:border-fuchsia-300/70 hover:bg-[#2e1554] cursor-pointer"
+                title="Open AI Platform Suite & System Telemetry Menu"
+                aria-expanded={showToolsDropdown}
               >
-                <Cpu size={16} className="text-amber-400" />
+                <Sparkles size={16} className="text-amber-400 animate-pulse" />
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Edge AI
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1 text-[9px] font-mono">Topology</span>
+                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1.5">
+                    Platform Suite
+                    <span className="rounded bg-fuchsia-500/25 px-1 text-[9px] font-mono text-fuchsia-200">
+                      8 Tools
+                    </span>
                   </span>
-                  <span className="text-[10px] text-fuchsia-200/80">Air-Gapped Laptop</span>
+                  <span className="text-[10px] text-fuchsia-200/80">
+                    {executionMode === "edge" ? "Edge AI (0ms)" : "Cloud API"} · {integrityState.integrityScore}%
+                  </span>
                 </div>
+                <ChevronDown
+                  size={14}
+                  className={`ml-1 text-fuchsia-300 transition-transform duration-200 ${
+                    showToolsDropdown ? "rotate-180" : ""
+                  }`}
+                />
               </button>
-              <button
-                type="button"
-                onClick={() => setShowIntegrityModal(true)}
-                className={`flex h-12 items-center gap-2 rounded-md border px-3 text-left shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition cursor-pointer ${
-                  integrityState.integrityScore < 75
-                    ? "border-amber-400/50 bg-[#351a24]/90 text-amber-200"
-                    : "border-fuchsia-400/25 bg-[#241044]/86 text-white hover:border-fuchsia-300/60"
-                }`}
-                title="Inspect Anti-Cheating & Interview Integrity Telemetry"
-              >
-                <ShieldCheck size={16} className={integrityState.integrityScore < 75 ? "text-amber-400" : "text-emerald-400"} />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight flex items-center gap-1 text-white">
-                    Integrity
-                    <span className={`rounded px-1 text-[9px] font-mono font-bold ${integrityState.integrityScore >= 85 ? "bg-emerald-400/20 text-emerald-300" : "bg-amber-400/20 text-amber-300"}`}>
+
+              {showToolsDropdown && (
+                <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-fuchsia-400/30 bg-[#170a2c]/98 p-2.5 text-white shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-1">
+                  <div className="px-2.5 py-1.5 border-b border-fuchsia-400/20 mb-1 flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fuchsia-300 flex items-center gap-1.5">
+                      <BrainCircuit size={13} className="text-fuchsia-400" />
+                      Platform Intelligence Suite
+                    </span>
+                    <span className="text-[10px] text-fuchsia-200/60 font-mono">MockMate v2.4</span>
+                  </div>
+
+                  {/* 1. Edge AI Mode Toggle */}
+                  <div
+                    onClick={() => setExecutionMode((prev) => (prev === "edge" ? "cloud" : "edge"))}
+                    className="flex items-center justify-between rounded-lg p-2 transition hover:bg-fuchsia-500/15 cursor-pointer group"
+                    title={`Click to switch to ${executionMode === "edge" ? "Cloud Mode" : "Edge AI Mode"}`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
+                        {executionMode === "edge" ? (
+                          <Zap size={16} className="text-amber-400 animate-pulse" />
+                        ) : (
+                          <Wifi size={16} className="text-sky-300" />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-white group-hover:text-amber-200">
+                            {executionMode === "edge" ? "Edge AI Mode" : "Cloud Mode"}
+                          </span>
+                          <span className="text-[9px] font-mono px-1 rounded bg-amber-400/20 text-amber-300">
+                            Toggle
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-fuchsia-200/70">
+                          {executionMode === "edge" ? "Air-Gapped Laptop" : "Remote Server API"}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                        executionMode === "edge"
+                          ? "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
+                          : "bg-sky-400/20 text-sky-200 border border-sky-400/30"
+                      }`}
+                    >
+                      {executionMode === "edge" ? "0ms" : "API"}
+                    </span>
+                  </div>
+
+                  {/* 2. Edge AI Topology */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEdgeModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
+                    title="Inspect Edge AI Architecture & Topology"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
+                        <Cpu size={16} className="text-amber-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-amber-200">
+                          Edge AI Topology
+                        </span>
+                        <span className="text-[10px] text-fuchsia-200/70">
+                          Air-Gapped Laptop Architecture
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-amber-400/20 text-amber-300 px-1.5 py-0.5 text-[9px] font-mono border border-amber-400/30">
+                      Topology
+                    </span>
+                  </button>
+
+                  {/* 3. Interview Integrity */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowIntegrityModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
+                    title="Inspect Anti-Cheating & Interview Integrity Telemetry"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-emerald-400/10 border border-emerald-400/30">
+                        <ShieldCheck
+                          size={16}
+                          className={integrityState.integrityScore < 75 ? "text-amber-400" : "text-emerald-400"}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-emerald-200">
+                          Interview Integrity
+                        </span>
+                        <span className="text-[10px] text-fuchsia-200/70">
+                          {integrityState.integrityLevel} · Proctoring Telemetry
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold border ${
+                        integrityState.integrityScore >= 85
+                          ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/30"
+                          : "bg-amber-400/20 text-amber-300 border-amber-400/30"
+                      }`}
+                    >
                       {integrityState.integrityScore}%
                     </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">{integrityState.integrityLevel}</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(true)}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60 cursor-pointer"
-                title="View Persistent Candidate Digital Profile & Mastery Vectors"
-              >
-                <Fingerprint size={16} className="text-purple-400" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Digital Profile
-                    <span className="rounded bg-purple-400/20 text-purple-300 px-1 text-[9px] font-mono">
+                  </button>
+
+                  {/* 4. Digital Profile */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
+                    title="View Persistent Candidate Digital Profile & Mastery Vectors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-purple-400/10 border border-purple-400/30">
+                        <Fingerprint size={16} className="text-purple-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-purple-200">
+                          Digital Profile
+                        </span>
+                        <span className="text-[10px] text-fuchsia-200/70">
+                          {digitalProfile.sessionsCompleted} Sessions Tracked
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-purple-400/20 text-purple-300 px-1.5 py-0.5 text-[9px] font-mono border border-purple-400/30">
                       {digitalProfile.overallReadiness}%
                     </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">{digitalProfile.sessionsCompleted} Sessions Tracked</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!activeBenchmark) {
-                    setActiveBenchmark(computeSessionBenchmark(history, profile, digitalProfile));
-                  }
-                  setShowBenchmarkModal(true);
-                }}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60 cursor-pointer"
-                title="View Longitudinal Benchmark & Cohort Progress (Interview #1 through #4)"
-              >
-                <Trophy size={16} className="text-amber-400" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Benchmark
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1 text-[9px] font-mono">
+                  </button>
+
+                  {/* 5. Longitudinal Benchmark */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!activeBenchmark) {
+                        setActiveBenchmark(computeSessionBenchmark(history, profile, digitalProfile));
+                      }
+                      setShowBenchmarkModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
+                    title="View Longitudinal Benchmark & Cohort Progress"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
+                        <Trophy size={16} className="text-amber-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-amber-200">
+                          Benchmark Cohort
+                        </span>
+                        <span className="text-[10px] text-fuchsia-200/70">
+                          4 Attempts · +18pts Progress
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-amber-400/20 text-amber-300 px-1.5 py-0.5 text-[9px] font-mono border border-amber-400/30">
                       Top 14%
                     </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">4 Attempts · +18pts</span>
+                  </button>
+
+                  {/* 6. CIU Knowledge Graph */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCiuGraphModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-cyan-500/15 cursor-pointer group"
+                    title="Browse Coding Interview University (CIU) Knowledge Graph & Rubrics"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-cyan-400/10 border border-cyan-400/30">
+                        <BookOpen size={16} className="text-cyan-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-cyan-200">
+                          CIU Knowledge Graph
+                        </span>
+                        <span className="text-[10px] text-cyan-200/70">
+                          CS Curriculum & Rubrics
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-cyan-400/20 text-cyan-300 px-1.5 py-0.5 text-[9px] font-mono border border-cyan-400/30">
+                      {CIU_KNOWLEDGE_GRAPH.length} Topics
+                    </span>
+                  </button>
+
+                  {/* 7. Candidate Skill Graph */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSkillGraphModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-pink-500/15 cursor-pointer group"
+                    title="View Resume vs CIU Competency Graph & Detected Weaknesses"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-pink-400/10 border border-pink-400/30">
+                        <BrainCircuit size={16} className="text-pink-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-pink-200">
+                          Candidate Skill Graph
+                        </span>
+                        <span className="text-[10px] text-pink-200/70">
+                          {candidateSkillGraph.weaknesses.length} Gaps Targeted
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-pink-400/20 text-pink-300 px-1.5 py-0.5 text-[9px] font-mono border border-pink-400/30">
+                      {candidateSkillGraph.overallSkillScore}%
+                    </span>
+                  </button>
+
+                  {/* 8. Interview Readiness */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReadinessModal(true);
+                      setShowToolsDropdown(false);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-emerald-500/15 cursor-pointer group"
+                    title="View Interview Readiness Progress & Past Session History"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid size-8 place-items-center rounded-md bg-emerald-400/10 border border-emerald-400/30">
+                        <TrendingUp size={16} className="text-emerald-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-white group-hover:text-emerald-200">
+                          Interview Readiness
+                        </span>
+                        <span className="text-[10px] text-emerald-200/70">
+                          {readinessSummary.deltaVsPrevious >= 0 ? `+${readinessSummary.deltaVsPrevious}` : readinessSummary.deltaVsPrevious} pts delta
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 text-[9px] font-mono border border-emerald-400/30">
+                      {readinessSummary.overallReadiness}/100
+                    </span>
+                  </button>
                 </div>
-              </button>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <ThemeToggle theme={panelTheme} onThemeChange={setPanelTheme} />
               <TimeWeatherPanel />
             </div>
@@ -1338,21 +1723,159 @@ export default function InterviewSimulator() {
                     ))}
                   </select>
                 </label>
+                {/* Target Company Selector (Optional) */}
+                <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50/60 p-2.5">
+                  <label className="flex items-center justify-between text-sm font-medium text-zinc-800 cursor-pointer">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <Target size={15} className={targetCompanyEnabled ? "text-emerald-600" : "text-zinc-400"} />
+                      Target Company
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-500 font-normal">
+                        {targetCompanyEnabled ? "Enabled" : "Optional (Disabled)"}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={targetCompanyEnabled}
+                        onChange={(e) => setTargetCompanyEnabled(e.target.checked)}
+                        className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        id="target-company-checkbox"
+                      />
+                    </div>
+                  </label>
+
+                  {targetCompanyEnabled ? (
+                    <div className="space-y-1 pt-1">
+                      <select
+                        value={targetCompany}
+                        onChange={(event) => setTargetCompany(event.target.value as TargetCompany)}
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white font-semibold text-zinc-900"
+                      >
+                        {TARGET_COMPANIES.map((comp) => (
+                          <option key={comp} value={comp}>
+                            {COMPANY_PROFILES[comp].name} ({COMPANY_PROFILES[comp].badge})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-zinc-500 italic">
+                        Questions &amp; evaluation will align with {COMPANY_PROFILES[targetCompany]?.name}&apos;s bar and standards.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500">
+                      Standard industry benchmarks will be used. Check to target a specific company.
+                    </p>
+                  )}
+                </div>
+                {/* Experience Level Selector (Feature #13) */}
+                <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+                  Experience Level
+                  <select
+                    value={experienceLevel}
+                    onChange={(event) => setExperienceLevel(event.target.value as ExperienceLevel)}
+                    className="h-10 rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white"
+                  >
+                    {EXPERIENCE_LEVELS.map((exp) => (
+                      <option key={exp} value={exp}>
+                        {exp}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {/* Candidate Skill Graph Summary Pill (Feature #2) */}
+                <div className="mt-1 rounded-lg border border-pink-200 bg-gradient-to-r from-pink-50/80 to-purple-50/80 p-2.5 space-y-1 text-xs shadow-2xs">
+                  <div className="flex items-center justify-between font-bold text-pink-950">
+                    <span className="flex items-center gap-1.5">
+                      <BrainCircuit size={13} className="text-pink-600" />
+                      Candidate Skill Graph
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSkillGraphModal(true)}
+                      className="text-[10px] font-bold text-pink-700 hover:underline cursor-pointer"
+                    >
+                      Inspect Graph →
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-emerald-700 font-semibold">{candidateSkillGraph.strengths.length} Strengths</span>
+                    <span className="text-rose-700 font-bold">{candidateSkillGraph.weaknesses.length} Gap Areas</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-600 font-mono truncate">
+                    Priority Gaps: {candidateSkillGraph.priorityInterviewTopics.slice(0, 3).join(", ")}
+                  </div>
+                </div>
               </div>
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Resume</h2>
-              <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 text-center transition hover:border-emerald-500 hover:bg-emerald-50">
-                <Upload size={24} className="text-emerald-700" />
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">
+                  Resume (Optional)
+                </h2>
+                {isResumeUploaded && (
+                  <button
+                    type="button"
+                    onClick={clearResume}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                  >
+                    Clear Resume
+                  </button>
+                )}
+              </div>
+
+              {isResumeUploaded ? (
+                <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/90 p-2.5 text-xs text-emerald-950 shadow-2xs">
+                  <div className="flex items-center justify-between font-bold text-emerald-900">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 size={15} className="text-emerald-600" />
+                      Resume Mode Active
+                    </span>
+                    <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                      Tailored to Resume
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-emerald-800">
+                    Questions will strictly probe projects, tech stack, and experiences in:{" "}
+                    <span className="font-semibold underline">{resumeFileName}</span>.
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/90 p-2.5 text-xs text-blue-950 shadow-2xs">
+                  <div className="flex items-center justify-between font-bold text-blue-900">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles size={15} className="text-blue-600" />
+                      Position Mode Active
+                    </span>
+                    <span className="rounded bg-blue-200/80 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+                      Role Curated
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-blue-800">
+                    No resume uploaded. Questions will be strictly based on your selected role:{" "}
+                    <span className="font-semibold underline">{profile.targetRole}</span> ({profile.department}).
+                  </p>
+                </div>
+              )}
+
+              <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 text-center transition hover:border-emerald-500 hover:bg-emerald-50">
+                <Upload size={22} className="text-emerald-700" />
                 <span className="max-w-full truncate text-sm font-medium text-zinc-800">
-                  {isUploadingResume ? "Extracting PDF & Indexing Chroma..." : resumeFileName}
+                  {isUploadingResume
+                    ? "Extracting Text & Indexing..."
+                    : isResumeUploaded
+                    ? `Replace Resume (${resumeFileName})`
+                    : "Upload Resume (.txt, .pdf, .docx)"}
+                </span>
+                <span className="text-[11px] text-zinc-500">
+                  Supports .txt, .pdf, .docx, .doc, .md
                 </span>
                 <input
                   className="sr-only"
                   type="file"
                   accept={
-                    ".txt,.md,.csv,.pdf,.doc,.docx,.rtf,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv"
+                    ".txt,.md,.pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown"
                   }
                   onChange={handleResumeUpload}
                 />
@@ -1414,35 +1937,29 @@ export default function InterviewSimulator() {
                 )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {INTERVIEW_TYPES.map((type) => {
-                  const isAvailable = isInterviewTypeAvailableForDepartment(profile.department, type);
-                  const isSelected = profile.interviewType === type;
-
+                {PLATFORM_INTERVIEW_MODES.map((mode) => {
+                  const isSelected = platformMode === mode;
                   return (
                     <button
-                      key={type}
+                      key={mode}
                       type="button"
-                      disabled={!isAvailable}
-                      onClick={() => handleInterviewTypeChange(type)}
-                      title={!isAvailable ? "Coding mode is available strictly for Technical department roles" : undefined}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-md border p-2.5 text-xs font-semibold transition cursor-pointer ${
+                      onClick={() => {
+                        setPlatformMode(mode);
+                        if (mode === "DSA Coding") handleInterviewTypeChange("Coding");
+                        else if (mode === "System Design") handleInterviewTypeChange("System Design");
+                        else if (mode === "HR Interview") handleInterviewTypeChange("HR");
+                        else handleInterviewTypeChange("Technical");
+                      }}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-md border p-2 text-xs font-semibold transition cursor-pointer ${
                         isSelected
                           ? "border-purple-600 bg-purple-900 text-white shadow-sm ring-2 ring-purple-500/20"
-                          : !isAvailable
-                          ? "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-50"
                           : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
                       }`}
                     >
-                      <span className="flex items-center gap-1.5">
-                        <span className={`size-2 rounded-full ${isSelected ? "bg-emerald-400" : "bg-zinc-300"}`} />
-                        <span>{type}</span>
+                      <span className="flex items-center gap-1.5 truncate max-w-full">
+                        <span className={`size-2 shrink-0 rounded-full ${isSelected ? "bg-emerald-400" : "bg-zinc-300"}`} />
+                        <span className="truncate text-[11px]">{mode}</span>
                       </span>
-                      {type === "Coding" && (
-                        <span className="text-[9px] font-mono text-fuchsia-300">Split IDE</span>
-                      )}
-                      {type === "System Design" && (
-                        <span className="text-[9px] font-mono text-purple-300">Whiteboard</span>
-                      )}
                     </button>
                   );
                 })}
@@ -1522,233 +2039,6 @@ export default function InterviewSimulator() {
                     </button>
                   );
                 })}
-              </div>
-            </section>
-
-            {/* AI Interviewer Persona Selector */}
-            <section>
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">AI Interviewer Persona</h2>
-                <span className="rounded bg-purple-100 text-purple-900 px-2 py-0.5 text-[10px] font-bold font-mono">
-                  {activePersona.avatarEmoji} {activePersona.name}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {INTERVIEWER_PERSONA_LIST.map((persona) => {
-                  const isSelected = (profile.personaId ?? "technical") === persona.id;
-
-                  return (
-                    <button
-                      key={persona.id}
-                      type="button"
-                      onClick={() => updateProfile("personaId", persona.id)}
-                      className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
-                        isSelected
-                          ? "border-purple-600 bg-gradient-to-r from-purple-950 to-slate-900 text-white shadow-md ring-1 ring-purple-500/30"
-                          : "border-zinc-200 bg-white text-zinc-800 hover:border-purple-300 hover:bg-purple-50/40"
-                      }`}
-                    >
-                      {/* Avatar container */}
-                      <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
-                        isSelected
-                          ? "bg-purple-800/60 border border-purple-500/40"
-                          : "bg-zinc-100 group-hover:bg-purple-100/70 border border-zinc-200/80"
-                      }`}>
-                        {persona.avatarEmoji}
-                      </div>
-
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="font-bold text-xs leading-tight truncate">
-                            {persona.name}
-                          </span>
-                          <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
-                            isSelected
-                              ? "bg-purple-500/30 text-purple-200 border border-purple-400/30"
-                              : persona.badgeBg
-                          }`}>
-                            {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
-                          </span>
-                        </div>
-                        <p className={`mt-0.5 text-[11px] leading-snug truncate ${
-                          isSelected ? "text-purple-200" : "text-zinc-500"
-                        }`}>
-                          {persona.tagline}
-                        </p>
-                      </div>
-
-                      {/* Selection indicator */}
-                      <div className="shrink-0">
-                        <div className={`size-4 rounded-full border flex items-center justify-center transition ${
-                          isSelected
-                            ? "border-emerald-400 bg-emerald-500 text-white"
-                            : "border-zinc-300 bg-transparent group-hover:border-purple-400"
-                        }`}>
-                          {isSelected && <div className="size-1.5 rounded-full bg-white" />}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Configurable Stress Mode Settings Panel (Shown when Stress Interviewer selected) */}
-              {profile.personaId === "stress_interviewer" && (
-                <div className="mt-3 rounded-xl border border-rose-300/80 bg-rose-50/70 p-3.5 text-xs text-rose-950 space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between border-b border-rose-200 pb-2">
-                    <div className="flex items-center gap-2 font-bold">
-                      <span>😈 Stress Mode Configuration</span>
-                      <span className="rounded bg-rose-200 px-2 py-0.5 text-[10px] font-mono font-bold text-rose-900">
-                        Configurable Pressure
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono text-rose-800">
-                      Intensity: {profile.stressConfig?.intensity ?? "moderate"}
-                    </span>
-                  </div>
-
-                  {/* Intensity Selector */}
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-rose-900">Time Pressure Intensity:</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "mild", label: "Mild (60s)", time: 60 },
-                        { id: "moderate", label: "Moderate (45s)", time: 45 },
-                        { id: "high", label: "High (30s)", time: 30 },
-                      ].map((lvl) => {
-                        const isCurrent = (profile.stressConfig?.intensity ?? "moderate") === lvl.id;
-                        return (
-                          <button
-                            key={lvl.id}
-                            type="button"
-                            onClick={() => {
-                              updateProfile("stressConfig", {
-                                ...profile.stressConfig,
-                                intensity: lvl.id as "mild" | "moderate" | "high",
-                                timeLimitSec: lvl.time,
-                                enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
-                                enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
-                              });
-                            }}
-                            className={`rounded-lg border p-2 text-center text-xs font-bold transition cursor-pointer ${
-                              isCurrent
-                                ? "border-rose-600 bg-rose-600 text-white shadow-xs"
-                                : "border-rose-200 bg-white text-rose-800 hover:bg-rose-100"
-                            }`}
-                          >
-                            {lvl.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Toggle Options */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={profile.stressConfig?.enableTimePressureClock ?? true}
-                        onChange={(e) => {
-                          updateProfile("stressConfig", {
-                            ...profile.stressConfig,
-                            intensity: profile.stressConfig?.intensity ?? "moderate",
-                            timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
-                            enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
-                            enableTimePressureClock: e.target.checked,
-                          });
-                        }}
-                        className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
-                      />
-                      <span className="font-semibold text-rose-900">Live Countdown HUD Clock</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={profile.stressConfig?.enableInterruptions ?? true}
-                        onChange={(e) => {
-                          updateProfile("stressConfig", {
-                            ...profile.stressConfig,
-                            intensity: profile.stressConfig?.intensity ?? "moderate",
-                            timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
-                            enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
-                            enableInterruptions: e.target.checked,
-                          });
-                        }}
-                        className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
-                      />
-                      <span className="font-semibold text-rose-900">Mid-Turn Rapid Probing</span>
-                    </label>
-                  </div>
-
-                  {/* Guardrail Safety Disclaimer */}
-                  <div className="rounded border border-rose-200 bg-white/70 p-2 text-[10.5px] text-rose-800 italic leading-tight">
-                    <span className="font-bold not-italic">Professional Guardrail: </span>
-                    Stress mode rigorously tests brevity and composure under tight deadlines without derogatory, abusive, or hostile language.
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Candidate Persistent Digital Profile Summary Card */}
-            <section className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/60 to-indigo-50/60 p-3 text-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-purple-950">
-                  <Fingerprint size={15} className="text-purple-600" />
-                  <span>Persistent Digital Profile</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(true)}
-                  className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
-                >
-                  View Full Profile →
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Technical</div>
-                  <div className="text-xs font-bold text-blue-700">{digitalProfile.pillars.technical.score}%</div>
-                </div>
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Communication</div>
-                  <div className="text-xs font-bold text-emerald-700">{digitalProfile.pillars.communication.score}%</div>
-                </div>
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Behavioral</div>
-                  <div className="text-xs font-bold text-purple-700">{digitalProfile.pillars.behavioral.score}%</div>
-                </div>
-              </div>
-
-              {/* Sample Top Key Skills */}
-              <div className="space-y-1 text-[10.5px] font-mono text-zinc-700">
-                <div className="flex items-center justify-between text-zinc-500 text-[10px]">
-                  <span>Tracked Skill Vector</span>
-                  <span>Proficiency</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Python</span>
-                  <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Machine Learning</span>
-                  <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>SQL Optimization</span>
-                  <span className="font-bold text-amber-700">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>RAG & LLM Architectures</span>
-                  <span className="font-bold text-rose-700">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
-                </div>
-              </div>
-
-              <div className="text-[10px] text-purple-900/80 bg-purple-100/60 rounded px-2 py-1 italic">
-                🧬 Future sessions start from this profile and probe priority growth areas.
               </div>
             </section>
 
@@ -2145,6 +2435,17 @@ export default function InterviewSimulator() {
                         </span>
                       </span>
                       <span className="text-[11px] text-zinc-500 font-normal truncate max-w-sm">{latestTurn.difficultyReason}</span>
+                    </div>
+                  )}
+
+                  {/* Multi-Aspect Intelligent Scorecard & Explanation (Feature #6, #17, #18) */}
+                  {latestMultiEvaluation && (
+                    <div className="mt-3 animate-in fade-in duration-300">
+                      <MultiAspectScorecard
+                        evaluation={latestMultiEvaluation}
+                        calibration={latestCalibration}
+                        onOpenCiuTopic={() => setShowCiuGraphModal(true)}
+                      />
                     </div>
                   )}
 
@@ -3023,199 +3324,253 @@ export default function InterviewSimulator() {
                   </div>
                 </section>
 
+                {/* AI Interviewer Persona Selector (Moved into Right Sidebar) */}
                 <section>
-                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Signal Analysis</h2>
-                  <div className="grid gap-2">
-                    <SignalRow
-                      label="Technical accuracy"
-                      value={latestTurn?.breakdown?.technical_accuracy ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown.technical_accuracy}/100` : "--/100"}
-                      detail={latestTurn?.adaptiveStrategy ?? "Mechanism depth & concept coverage"}
-                    />
-                    <SignalRow
-                      label="Semantic relevance"
-                      value={latestTurn?.breakdown?.semantic_relevance ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown.semantic_relevance}/100` : "--/100"}
-                      detail="Question & keyword semantic alignment"
-                    />
-                    <SignalRow
-                      label="Answer structure"
-                      value={latestTurn?.breakdown?.answer_structure ?? 0}
-                      displayValue={
-                        latestTurn?.structureAnalysis
-                          ? `${latestTurn.structureAnalysis.framework === "STAR" ? "STAR" : "5-Point"}: ${latestTurn.breakdown.answer_structure}/100`
-                          : latestTurn
-                          ? `${latestTurn.breakdown.answer_structure}/100`
-                          : "--/100"
-                      }
-                      detail={
-                        latestTurn?.structureAnalysis?.coachingFeedback
-                          ? latestTurn.structureAnalysis.coachingFeedback
-                          : "Framework compliance & logical narrative flow"
-                      }
-                    />
-                    <SignalRow
-                      label="Speaking pace"
-                      value={
-                        speechState.wpm > 0
-                          ? Math.min(100, Math.round((speechState.wpm / 160) * 100))
-                          : latestTurn?.signals.paceStats
-                          ? Math.min(100, Math.round((latestTurn.signals.paceStats.wpm / 160) * 100))
-                          : latestTurn?.breakdown
-                          ? latestTurn.breakdown.speaking_pace
-                          : 0
-                      }
-                      displayValue={
-                        speechState.wpm > 0
-                          ? `${speechState.wpm} WPM`
-                          : latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.wpm} WPM`
-                          : micEnabled && isRecording
-                          ? "Listening..."
-                          : micEnabled
-                          ? "Ready"
-                          : "-- WPM"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.paceRating} · ${latestTurn.signals.paceStats.wordsSpoken} words in ${latestTurn.signals.paceStats.speechDurationSec}s`
-                          : speechState.wpm > 0
-                          ? `${speechState.paceRating} · ${speechState.wordsCount} words in ${speechState.speechDurationSec}s`
-                          : micEnabled
-                          ? "Speak into mic to measure pace"
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Pauses & hesitation"
-                      value={
-                        latestTurn?.signals.paceStats
-                          ? Math.max(0, 100 - (latestTurn.signals.paceStats.longPausesCount * 15 + Math.round(latestTurn.signals.paceStats.averagePauseSec * 10)))
-                          : speechState.longPausesCount > 0
-                          ? Math.max(0, 100 - speechState.longPausesCount * 15)
-                          : 88
-                      }
-                      displayValue={
-                        latestTurn?.signals.paceStats
-                          ? `Avg ${latestTurn.signals.paceStats.averagePauseSec}s · ${latestTurn.signals.paceStats.longPausesCount} long pauses`
-                          : speechState.pauseCount > 0
-                          ? `Avg ${speechState.averagePauseSec}s · ${speechState.longPausesCount} long`
-                          : "--"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.pauseCount} total pauses · longest: ${latestTurn.signals.paceStats.longestPauseSec}s`
-                          : micEnabled
-                          ? "Natural speech breath & pause tracking"
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Filler words"
-                      value={latestTurn?.breakdown?.filler_words ?? (latestTurn?.signals.paceStats ? Math.max(0, 100 - latestTurn.signals.paceStats.fillerWordsCount * 15) : 100)}
-                      displayValue={
-                        latestTurn?.signals.paceStats
-                          ? `Total: ${latestTurn.signals.paceStats.fillerWordsCount}`
-                          : speechState.totalFillers > 0
-                          ? `Total: ${speechState.totalFillers}`
-                          : "0 fillers"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats && latestTurn.signals.paceStats.fillerBreakdown?.length > 0
-                          ? latestTurn.signals.paceStats.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
-                          : speechState.fillerBreakdown?.length > 0
-                          ? speechState.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
-                          : "Clean speech delivery without filler bridging"
-                      }
-                    />
-                    <SignalRow
-                      label="Speech consistency"
-                      value={
-                        latestTurn?.signals.voiceStats?.consistencyScore ?? (micEnabled ? 88 : 0)
-                      }
-                      displayValue={
-                        latestTurn?.signals.voiceStats
-                          ? `Vol Var: ${latestTurn.signals.voiceStats.volumeVariabilityPercent}% · Pitch: ±${latestTurn.signals.voiceStats.pitchVariabilityHz}Hz`
-                          : micEnabled
-                          ? "Analyzing acoustic modulation..."
-                          : "--"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats?.paceTrend !== "steady"
-                          ? latestTurn?.signals.paceStats?.paceTrendDescription
-                          : latestTurn?.signals.voiceStats
-                          ? `Avg pitch ${latestTurn.signals.voiceStats.averagePitchHz}Hz · steady dynamic volume range`
-                          : "Acoustic volume & pitch dynamic tracking"
-                      }
-                    />
-                    <SignalRow
-                      label="Voice energy"
-                      value={micEnabled ? voiceSignal.energy : latestTurn?.breakdown?.voice_energy ?? latestTurn?.signals.voiceStats?.averageEnergy ?? latestTurn?.signals.voice ?? 0}
-                      detail={
-                        latestTurn?.signals.voiceStats
-                          ? `Avg ${latestTurn.signals.voiceStats.averageEnergy}% · Min ${latestTurn.signals.voiceStats.minEnergy}% · Max ${latestTurn.signals.voiceStats.maxEnergy}%`
-                          : micEnabled && typeof voiceSignal.db === "number"
-                          ? `${voiceSignal.db} dBFS · RMS ${voiceSignal.rms}`
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Eye contact"
-                      value={cameraEnabled ? eyeContact : latestTurn?.breakdown?.eye_contact ?? latestTurn?.signals.eyeContact ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown?.eye_contact ?? latestTurn.signals.eyeContact}/100` : cameraEnabled ? `${eyeContact}/100` : "--/100"}
-                      detail={cameraEnabled && eyeContactResult ? `Status: ${eyeContactResult.status}` : "MediaPipe face mesh gaze"}
-                    />
-                    <SignalRow
-                      label="Head movement"
-                      value={cameraEnabled && eyeContactResult ? eyeContactResult.headMovementScore : latestTurn?.signals.bodyLanguageStats?.headMovementScore ?? (cameraEnabled ? 85 : 0)}
-                      displayValue={cameraEnabled && eyeContactResult ? `${eyeContactResult.headMovementScore}/100` : latestTurn?.signals.bodyLanguageStats ? `${latestTurn.signals.bodyLanguageStats.headMovementScore}/100` : "--/100"}
-                      detail="Head posture stability & composure"
-                    />
-                    <SignalRow
-                      label="Face orientation"
-                      value={cameraEnabled && eyeContactResult ? eyeContactResult.facingCameraPercent : latestTurn?.signals.bodyLanguageStats?.facingCameraPercent ?? (cameraEnabled ? 87 : 0)}
-                      displayValue={cameraEnabled && eyeContactResult ? `Facing camera: ${eyeContactResult.facingCameraPercent}%` : latestTurn?.signals.bodyLanguageStats ? `Facing camera: ${latestTurn.signals.bodyLanguageStats.facingCameraPercent}%` : "--%"}
-                      detail="Frontal camera alignment"
-                    />
-                    <SignalRow
-                      label="Looking away count"
-                      value={
-                        cameraEnabled && eyeContactResult
-                          ? Math.max(0, 100 - eyeContactResult.lookingAwayCount * 8)
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? Math.max(0, 100 - latestTurn.signals.bodyLanguageStats.lookingAwayCount * 8)
-                          : 90
-                      }
-                      displayValue={
-                        cameraEnabled && eyeContactResult
-                          ? `${eyeContactResult.lookingAwayCount} times`
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? `${latestTurn.signals.bodyLanguageStats.lookingAwayCount} times`
-                          : "0 times"
-                      }
-                      detail="Distinct glance shifts away from camera"
-                    />
-                    <SignalRow
-                      label="Facial expression"
-                      value={
-                        cameraEnabled && eyeContactResult
-                          ? eyeContactResult.expressionDistribution.neutralPercent + eyeContactResult.expressionDistribution.positivePercent
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent + latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent
-                          : 85
-                      }
-                      displayValue={
-                        cameraEnabled && eyeContactResult
-                          ? `Neutral ${eyeContactResult.expressionDistribution.neutralPercent}% · Pos ${eyeContactResult.expressionDistribution.positivePercent}% · Tense ${eyeContactResult.expressionDistribution.tensePercent}%`
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? `Neutral ${latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent}% · Pos ${latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent}% · Tense ${latestTurn.signals.bodyLanguageStats.expressionDistribution.tensePercent}%`
-                          : "Neutral 62% · Pos 24% · Tense 14%"
-                      }
-                      detail="Broad communication presence (not emotion/lie detection)"
-                    />
-                    <SignalRow label="Question latency" value={Math.max(0, 100 - Math.round(backendLatency / 8))} />
+                  <div className="mb-2 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">AI Interviewer Persona</h2>
+                    <span className="rounded bg-purple-100 text-purple-900 px-2 py-0.5 text-[10px] font-bold font-mono">
+                      {activePersona.avatarEmoji} {activePersona.name}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {INTERVIEWER_PERSONA_LIST.map((persona) => {
+                      const isSelected = (profile.personaId ?? "technical") === persona.id;
+
+                      return (
+                        <button
+                          key={persona.id}
+                          type="button"
+                          onClick={() => updateProfile("personaId", persona.id)}
+                          className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                            isSelected
+                              ? "border-purple-600 bg-gradient-to-r from-purple-950 to-slate-900 text-white shadow-md ring-1 ring-purple-500/30"
+                              : "border-zinc-200 bg-white text-zinc-800 hover:border-purple-300 hover:bg-purple-50/40"
+                          }`}
+                        >
+                          {/* Avatar container */}
+                          <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
+                            isSelected
+                              ? "bg-purple-800/60 border border-purple-500/40"
+                              : "bg-zinc-100 group-hover:bg-purple-100/70 border border-zinc-200/80"
+                          }`}>
+                            {persona.avatarEmoji}
+                          </div>
+
+                          {/* Info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-bold text-xs leading-tight truncate">
+                                {persona.name}
+                              </span>
+                              <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
+                                isSelected
+                                  ? "bg-purple-500/30 text-purple-200 border border-purple-400/30"
+                                  : persona.badgeBg
+                              }`}>
+                                {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
+                              </span>
+                            </div>
+                            <p className={`mt-0.5 text-[11px] leading-snug truncate ${
+                              isSelected ? "text-purple-200" : "text-zinc-500"
+                            }`}>
+                              {persona.tagline}
+                            </p>
+                          </div>
+
+                          {/* Selection indicator */}
+                          <div className="shrink-0">
+                            <div className={`size-4 rounded-full border flex items-center justify-center transition ${
+                              isSelected
+                                ? "border-emerald-400 bg-emerald-500 text-white"
+                                : "border-zinc-300 bg-transparent group-hover:border-purple-400"
+                            }`}>
+                              {isSelected && <div className="size-1.5 rounded-full bg-white" />}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Configurable Stress Mode Settings Panel */}
+                  {profile.personaId === "stress_interviewer" && (
+                    <div className="mt-3 rounded-xl border border-rose-300/80 bg-rose-50/70 p-3.5 text-xs text-rose-950 space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between border-b border-rose-200 pb-2">
+                        <div className="flex items-center gap-2 font-bold">
+                          <span>😈 Stress Mode Configuration</span>
+                          <span className="rounded bg-rose-200 px-2 py-0.5 text-[10px] font-mono font-bold text-rose-900">
+                            Configurable Pressure
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-rose-800">
+                          Intensity: {profile.stressConfig?.intensity ?? "moderate"}
+                        </span>
+                      </div>
+
+                      {/* Intensity Selector */}
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-rose-900">Time Pressure Intensity:</span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "mild", label: "Mild (60s)", time: 60 },
+                            { id: "moderate", label: "Moderate (45s)", time: 45 },
+                            { id: "high", label: "High (30s)", time: 30 },
+                          ].map((lvl) => {
+                            const isCurrent = (profile.stressConfig?.intensity ?? "moderate") === lvl.id;
+                            return (
+                              <button
+                                key={lvl.id}
+                                type="button"
+                                onClick={() => {
+                                  updateProfile("stressConfig", {
+                                    ...profile.stressConfig,
+                                    intensity: lvl.id as "mild" | "moderate" | "high",
+                                    timeLimitSec: lvl.time,
+                                    enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
+                                    enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
+                                  });
+                                }}
+                                className={`rounded-lg border p-2 text-center text-xs font-bold transition cursor-pointer ${
+                                  isCurrent
+                                    ? "border-rose-600 bg-rose-600 text-white shadow-xs"
+                                    : "border-rose-200 bg-white text-rose-800 hover:bg-rose-100"
+                                }`}
+                              >
+                                {lvl.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Toggle Options */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profile.stressConfig?.enableTimePressureClock ?? true}
+                            onChange={(e) => {
+                              updateProfile("stressConfig", {
+                                ...profile.stressConfig,
+                                intensity: profile.stressConfig?.intensity ?? "moderate",
+                                timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
+                                enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
+                                enableTimePressureClock: e.target.checked,
+                              });
+                            }}
+                            className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                          />
+                          <span className="font-semibold text-rose-900">Live Countdown HUD Clock</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profile.stressConfig?.enableInterruptions ?? true}
+                            onChange={(e) => {
+                              updateProfile("stressConfig", {
+                                ...profile.stressConfig,
+                                intensity: profile.stressConfig?.intensity ?? "moderate",
+                                timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
+                                enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
+                                enableTimePressureClock: e.target.checked,
+                              });
+                            }}
+                            className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                          />
+                          <span className="font-semibold text-rose-900">Mid-Turn Rapid Probing</span>
+                        </label>
+                      </div>
+
+                      {/* Guardrail Safety Disclaimer */}
+                      <div className="rounded border border-rose-200 bg-white/70 p-2 text-[10.5px] text-rose-800 italic leading-tight">
+                        <span className="font-bold not-italic">Professional Guardrail: </span>
+                        Stress mode rigorously tests brevity and composure under tight deadlines without derogatory, abusive, or hostile language.
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Candidate Persistent Digital Profile Summary Card */}
+                <section className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/60 to-indigo-50/60 p-3 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-purple-950">
+                      <Fingerprint size={15} className="text-purple-600" />
+                      <span>Persistent Digital Profile</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileModal(true)}
+                      className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
+                    >
+                      View Full Profile →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
+                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
+                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Technical</div>
+                      <div className="text-xs font-bold text-blue-700">{digitalProfile.pillars.technical.score}%</div>
+                    </div>
+                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
+                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Communication</div>
+                      <div className="text-xs font-bold text-emerald-700">{digitalProfile.pillars.communication.score}%</div>
+                    </div>
+                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
+                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Behavioral</div>
+                      <div className="text-xs font-bold text-purple-700">{digitalProfile.pillars.behavioral.score}%</div>
+                    </div>
+                  </div>
+
+                  {/* Sample Top Key Skills */}
+                  <div className="space-y-1 text-[10.5px] font-mono text-zinc-700">
+                    <div className="flex items-center justify-between text-zinc-500 text-[10px]">
+                      <span>Tracked Skill Vector</span>
+                      <span>Proficiency</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Python</span>
+                      <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Machine Learning</span>
+                      <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>SQL Optimization</span>
+                      <span className="font-bold text-amber-700">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>RAG & LLM Architectures</span>
+                      <span className="font-bold text-rose-700">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-purple-900/80 bg-purple-100/60 rounded px-2 py-1 italic">
+                    🧬 Future sessions start from this profile and probe priority growth areas.
                   </div>
                 </section>
+
+                {stage === "setup" ? (
+                  <button
+                    type="button"
+                    onClick={startInterview}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 cursor-pointer shadow-sm"
+                  >
+                    <Play size={17} fill="currentColor" />
+                    Start Interview
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 p-2.5 text-xs text-emerald-900 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <Activity size={14} className="text-emerald-600 animate-pulse" />
+                      Session Live ({activePersona.name})
+                    </span>
+                    <span className="rounded bg-emerald-200 px-1.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
+                      Turn {questionIndex + 1}/6
+                    </span>
+                  </div>
+                )}
 
                 <section className="min-h-36">
                   <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Feedback</h2>
@@ -3509,6 +3864,30 @@ export default function InterviewSimulator() {
             setActiveSystemDesignEvaluation(evalResult);
             setShowSystemDesignModal(true);
           }}
+        />
+      )}
+
+      {showCiuGraphModal && (
+        <CiuKnowledgeGraphModal
+          isOpen={showCiuGraphModal}
+          onClose={() => setShowCiuGraphModal(false)}
+        />
+      )}
+
+      {showSkillGraphModal && (
+        <CandidateSkillGraphModal
+          isOpen={showSkillGraphModal}
+          onClose={() => setShowSkillGraphModal(false)}
+          skillGraph={candidateSkillGraph}
+        />
+      )}
+
+      {showReadinessModal && (
+        <InterviewReadinessModal
+          isOpen={showReadinessModal}
+          onClose={() => setShowReadinessModal(false)}
+          readinessSummary={readinessSummary}
+          sessions={storedSessions}
         />
       )}
 

@@ -34,6 +34,24 @@ body {
   pointer-events: none;
   filter: saturate(1.18) contrast(1.05);
   opacity: 1;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+@media (max-width: 768px) {
+  .interactive-bg {
+    filter: none !important;
+  }
+
+  /* Disable expensive backdrop-filter calculations on mobile GPUs */
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }
 
 body > main {

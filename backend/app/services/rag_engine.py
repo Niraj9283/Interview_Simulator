@@ -64,6 +64,26 @@ class RAGEngine:
                 extracted_pages.append(text)
         return "\n\n".join(extracted_pages)
 
+    def extract_text_from_docx(self, docx_bytes: bytes) -> str:
+        """Extract text from uploaded DOCX resume using zipfile & XML."""
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            with zipfile.ZipFile(io.BytesIO(docx_bytes)) as z:
+                if "word/document.xml" not in z.namelist():
+                    return ""
+                xml_content = z.read("word/document.xml")
+                root = ET.fromstring(xml_content)
+                ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                paragraphs = []
+                for p in root.iter(f"{{{ns['w']}}}p"):
+                    texts = [node.text for node in p.iter(f"{{{ns['w']}}}t") if node.text]
+                    if texts:
+                        paragraphs.append("".join(texts))
+                return "\n\n".join([p.strip() for p in paragraphs if p.strip()])
+        except Exception as err:
+            return ""
+
     def parse_and_chunk_resume(self, resume_text: str, candidate_name: str = "Candidate") -> list[dict[str, Any]]:
         """
         Parses resume text into structured domain chunks:

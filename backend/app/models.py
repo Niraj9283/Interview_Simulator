@@ -197,3 +197,39 @@ class RAGResumeUploadResponse(BaseModel):
 class RAGStatusResponse(BaseModel):
     status: str
     collections: dict[str, dict]
+
+
+class CIUTopicModel(BaseModel):
+    id: str
+    name: str
+    domain: str
+    subdomain: str
+    difficulty: str
+    prerequisites: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    key_concepts: list[str] = Field(default_factory=list)
+    description: str
+    sample_questions: list[str] = Field(default_factory=list)
+    ciu_reference_url: str
+
+
+class SkillGraphNodeModel(BaseModel):
+    name: str
+    category: str
+    proficiencyPercent: int
+    isWeakness: bool
+    isStrength: bool
+    status: str
+    matchedCiuTopics: list[str] = Field(default_factory=list)
+    evidenceText: str = ""
+
+
+class CandidateSkillGraphResponse(BaseModel):
+    candidateName: str
+    totalSkillsDetected: int
+    overallSkillScore: int
+    skills: list[SkillGraphNodeModel]
+    strengths: list[str]
+    weaknesses: list[str]
+    priorityInterviewTopics: list[str]
+

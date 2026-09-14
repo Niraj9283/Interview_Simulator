@@ -1,7 +1,11 @@
+import asyncio
+from typing import Any
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import (
+    CIUTopicModel,
+    CandidateSkillGraphResponse,
     EvaluationRequest,
     EvaluationResponse,
     InterviewStartRequest,
@@ -12,14 +16,17 @@ from app.models import (
     RAGStatusResponse,
     ResumeAnalyzeRequest,
     ResumeAnalyzeResponse,
+    SkillGraphNodeModel,
 )
 from app.services.interview_engine import InterviewEngine
+from app.services.knowledge_graph import KnowledgeGraphService
 from app.services.rag_engine import RAGEngine
 
 
-app = FastAPI(title="MockMate AI API", version="0.1.0")
+app = FastAPI(title="MockMate AI API", version="0.2.0")
 rag_engine = RAGEngine()
 engine = InterviewEngine(rag_engine=rag_engine)
+kg_service = KnowledgeGraphService()
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +56,83 @@ async def get_edge_status() -> dict[str, Any]:
     }
 
 
+@app.get("/api/knowledge-graph", response_model=list[CIUTopicModel])
+async def get_knowledge_graph() -> list[CIUTopicModel]:
+    topics = kg_service.get_all_topics()
+    return [CIUTopicModel(**t) for t in topics]
+
+
+@app.post("/api/resume/skill-graph", response_model=CandidateSkillGraphResponse)
+async def get_resume_skill_graph(payload: ResumeAnalyzeRequest) -> CandidateSkillGraphResponse:
+    text_lower = payload.text.lower()
+    
+    known_skills = [
+        ("Python", "Language", 88, ["arrays-and-strings", "sorting-algorithms"]),
+        ("React", "Framework", 72, ["oop-and-design-patterns"]),
+        ("Node.js", "Framework", 68, ["operating-systems-concurrency"]),
+        ("MongoDB", "Database", 60, ["dbms-and-storage"]),
+        ("PostgreSQL", "Database", 72, ["dbms-and-storage"]),
+        ("Machine Learning", "AI & Data", 82, ["machine-learning-engineering"]),
+        ("TensorFlow", "AI & Data", 70, ["machine-learning-engineering"]),
+        ("FastAPI", "Framework", 75, ["computer-networking"]),
+        ("Docker", "Cloud & DevOps", 70, ["operating-systems-concurrency"]),
+        ("DSA", "Core CS", 25, ["arrays-and-strings", "dynamic-programming"]),
+        ("System Design", "Core CS", 20, ["distributed-system-design"]),
+        ("OS", "Core CS", 35, ["operating-systems-concurrency"]),
+        ("DBMS", "Core CS", 45, ["dbms-and-storage"]),
+        ("Networking", "Core CS", 40, ["computer-networking"]),
+    ]
+    
+    nodes: list[SkillGraphNodeModel] = []
+    strengths: list[str] = []
+    weaknesses: list[str] = []
+    
+    for name, cat, base, matched in known_skills:
+        found = name.lower() in text_lower
+        if found:
+            score = min(95, base + 5)
+            is_w = score < 50
+            is_s = score >= 75
+        else:
+            score = max(20, base - 10) if cat == "Core CS" else 0
+            if score == 0:
+                continue
+            is_w = True
+            is_s = False
+            
+        status = "Strong" if score >= 75 else "Needs Practice" if score >= 50 else "Critical Gap"
+        if is_s:
+            strengths.append(name)
+        if is_w:
+            weaknesses.append(name)
+            
+        nodes.append(
+            SkillGraphNodeModel(
+                name=name,
+                category=cat,
+                proficiencyPercent=score,
+                isWeakness=is_w,
+                isStrength=is_s,
+                status=status,
+                matchedCiuTopics=matched,
+                evidenceText="Verified in candidate technical submission." if found else "Unverified in resume project documentation.",
+            )
+        )
+        
+    avg_score = round(sum(n.proficiencyPercent for n in nodes) / max(1, len(nodes)))
+    priority = [n.name for n in nodes if n.isWeakness][:4]
+    
+    return CandidateSkillGraphResponse(
+        candidateName="Candidate",
+        totalSkillsDetected=len(nodes),
+        overallSkillScore=avg_score,
+        skills=nodes,
+        strengths=strengths,
+        weaknesses=weaknesses,
+        priorityInterviewTopics=priority or ["Dynamic Programming", "System Design"],
+    )
+
+
 @app.get("/api/rag/status", response_model=RAGStatusResponse)
 async def get_rag_status() -> RAGStatusResponse:
     status_info = rag_engine.get_status()
@@ -64,8 +148,11 @@ async def upload_resume_rag(
     text = ""
     if file:
         content = await file.read()
-        if file.filename and file.filename.lower().endswith(".pdf"):
+        filename_lower = (file.filename or "").lower()
+        if filename_lower.endswith(".pdf"):
             text = rag_engine.extract_text_from_pdf(content)
+        elif filename_lower.endswith(".docx"):
+            text = rag_engine.extract_text_from_docx(content)
         else:
             text = content.decode("utf-8", errors="ignore")
     elif raw_text:

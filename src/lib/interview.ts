@@ -26,6 +26,7 @@ import {
   InterviewInputMode,
   VoiceTranscriptBundle,
 } from "./voice-answer-engine";
+import { CIU_KNOWLEDGE_GRAPH, CIUTopicNode } from "./knowledge-graph";
 
 export type InterviewDomain = InterviewTrack;
 
@@ -1188,6 +1189,10 @@ export type InterviewTurn = {
   retrievedConcepts?: string[];
   technicalDepthScore?: number;
   adaptiveStrategy?: string;
+  ciuTopic?: CIUTopicNode;
+  probingQuestion?: string;
+  missedCriteria?: string[];
+  strongSignalsFound?: string[];
   currentDifficulty?: InterviewDifficulty;
   difficultyTrend?: "escalated" | "maintained" | "calibrated_down" | "clarification";
   difficultyReason?: string;
@@ -1477,6 +1482,47 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
 ];
 
+export function matchCIUTopicForContext(
+  question: string,
+  answer: string,
+  keywords: string[] = []
+): CIUTopicNode | undefined {
+  const normQ = question.toLowerCase();
+  const normA = answer.toLowerCase();
+  const kwStr = keywords.join(" ").toLowerCase();
+
+  let bestTopic: CIUTopicNode | undefined;
+  let highestScore = 0;
+
+  for (const topic of CIU_KNOWLEDGE_GRAPH) {
+    let score = 0;
+    const nameLower = topic.name.toLowerCase();
+    if (normQ.includes(nameLower)) score += 6;
+    if (kwStr.includes(nameLower)) score += 3;
+    if (normA.includes(nameLower)) score += 2;
+
+    for (const concept of topic.keyConcepts) {
+      const cLower = concept.toLowerCase();
+      if (normQ.includes(cLower)) score += 4;
+      if (kwStr.includes(cLower)) score += 2;
+      if (normA.includes(cLower)) score += 1;
+    }
+
+    for (const skill of topic.skills) {
+      const sLower = skill.toLowerCase();
+      if (normQ.includes(sLower)) score += 3;
+      if (kwStr.includes(sLower)) score += 2;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestTopic = topic;
+    }
+  }
+
+  return highestScore >= 3 ? bestTopic : undefined;
+}
+
 export function diagnoseTechnicalDepth(
   question: string,
   answer: string,
@@ -1486,11 +1532,91 @@ export function diagnoseTechnicalDepth(
   retrievedConcepts: string[];
   depthScore: number;
   adaptiveStrategy: string;
+  ciuTopic?: CIUTopicNode;
+  probingQuestion?: string;
+  missedCriteria?: string[];
+  strongSignalsFound?: string[];
 } {
   const normQ = question.toLowerCase();
   const normA = answer.toLowerCase();
   const words = normA.match(/[a-z0-9+#.-]+/g) ?? [];
   const wordCount = words.length;
+
+  const matchedCIUTopic = matchCIUTopicForContext(question, answer, keywords);
+
+  if (matchedCIUTopic) {
+    const missedCriteria: string[] = [];
+    const strongSignalsFound: string[] = [];
+    let redFlagsFound = false;
+
+    for (const crit of matchedCIUTopic.evaluationRubric.minimumCriteria) {
+      const critWords = crit.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
+      const hasMatch = critWords.some((w) => normA.includes(w));
+      if (!hasMatch) {
+        missedCriteria.push(crit);
+      }
+    }
+
+    for (const sig of matchedCIUTopic.evaluationRubric.strongSignals) {
+      const sigWords = sig.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
+      if (sigWords.some((w) => normA.includes(w))) {
+        strongSignalsFound.push(sig);
+      }
+    }
+
+    for (const rf of matchedCIUTopic.evaluationRubric.redFlags) {
+      const rfWords = rf.toLowerCase().split(/\W+/).filter((w) => w.length > 5);
+      if (rfWords.some((w) => normA.includes(w))) {
+        redFlagsFound = true;
+      }
+    }
+
+    const hasCausality = ["because", "since", "due to", "resulted in", "therefore", "tradeoff", "reduces", "improves", "mitigates"].some((w) =>
+      normA.includes(w)
+    );
+
+    let baseDepth = 48;
+    if (wordCount >= 20) baseDepth += 10;
+    if (wordCount >= 45) baseDepth += 8;
+
+    const satisfiedRatio = matchedCIUTopic.evaluationRubric.minimumCriteria.length > 0
+      ? (matchedCIUTopic.evaluationRubric.minimumCriteria.length - missedCriteria.length) / matchedCIUTopic.evaluationRubric.minimumCriteria.length
+      : 1;
+    baseDepth += Math.round(satisfiedRatio * 22);
+    baseDepth += Math.min(18, strongSignalsFound.length * 9);
+    if (hasCausality) baseDepth += 6;
+    if (redFlagsFound) baseDepth -= 18;
+
+    const depthScore = Math.max(30, Math.min(98, baseDepth));
+    const isStrong = missedCriteria.length === 0 && depthScore >= 74;
+
+    if (!isStrong) {
+      const primaryGap = missedCriteria[0] || `${matchedCIUTopic.name} foundational mechanics`;
+      const probingQ = `You discussed ${matchedCIUTopic.name}, but didn't clearly address ${primaryGap}. Could you explain how this works in practice and what tradeoffs emerge in production?`;
+      return {
+        weakArea: `${matchedCIUTopic.name}: Missing ${primaryGap}`,
+        retrievedConcepts: matchedCIUTopic.keyConcepts,
+        depthScore,
+        adaptiveStrategy: `Targeted Probing: Drilling down into ${matchedCIUTopic.name}`,
+        ciuTopic: matchedCIUTopic,
+        probingQuestion: probingQ,
+        missedCriteria,
+        strongSignalsFound,
+      };
+    }
+
+    const advancedQ = matchedCIUTopic.sampleQuestions[1] || matchedCIUTopic.sampleQuestions[0] || `How would you architect and optimize ${matchedCIUTopic.name} under extreme production concurrency?`;
+    return {
+      weakArea: null,
+      retrievedConcepts: matchedCIUTopic.keyConcepts,
+      depthScore,
+      adaptiveStrategy: `Deepening Complexity: High-scale tradeoffs in ${matchedCIUTopic.name}`,
+      ciuTopic: matchedCIUTopic,
+      probingQuestion: advancedQ,
+      missedCriteria,
+      strongSignalsFound,
+    };
+  }
 
   let matchedEntry = CONCEPT_CATALOG.find((entry) =>
     entry.triggers.some((trigger) => normQ.includes(trigger))
@@ -1546,6 +1672,7 @@ export function diagnoseTechnicalDepth(
       retrievedConcepts: matchedEntry.concepts,
       depthScore,
       adaptiveStrategy: "Probing Weak Area via RAG Retrieval",
+      probingQuestion: matchedEntry.probingQuestion,
     };
   }
 
@@ -1554,6 +1681,7 @@ export function diagnoseTechnicalDepth(
     retrievedConcepts: matchedEntry.concepts,
     depthScore,
     adaptiveStrategy: "Deepening Complexity / Advanced Tradeoffs",
+    probingQuestion: matchedEntry.advancedQuestion,
   };
 }
 
@@ -1609,8 +1737,11 @@ export function generateQuestion(
     return `You mentioned developing ${proj.title} using ${proj.primarySkill}. What were the primary architectural tradeoffs you made regarding concurrency, data consistency, and error recovery?`;
   }
 
-  // 2. Genuine Adaptive Follow-up: If previous turn revealed weak conceptual depth, drill down via RAG
+  // 2. Genuine Adaptive Follow-up: If previous turn revealed weak conceptual depth, drill down via RAG / CIU Probing
   if (lastTurn && lastTurn.weakArea) {
+    if (lastTurn.probingQuestion) {
+      return lastTurn.probingQuestion;
+    }
     if (lastTurn.weakArea.includes("Random Forest")) {
       return "How does Random Forest reduce overfitting compared with a single decision tree?";
     }
@@ -1630,6 +1761,14 @@ export function generateQuestion(
       return "When designing a real-time ingestion pipeline handling 50k events/sec, how do Kafka partitions and consumer group offsets prevent backpressure bottlenecks?";
     }
     return `Can you drill down into the core technical mechanism for ${lastTurn.weakArea}: specifically the algorithmic tradeoffs and edge cases?`;
+  }
+
+  // 2.2 Advanced Escalation: If previous turn demonstrated mastery on a CIU topic and difficulty escalated
+  if (lastTurn && !lastTurn.weakArea && lastTurn.ciuTopic && turnIndex > 0) {
+    if (effectiveDifficulty === "Senior") {
+      const advancedQ = lastTurn.ciuTopic.sampleQuestions[1] || `How would you architect and benchmark ${lastTurn.ciuTopic.name} under 100x production load with strict latency bounds?`;
+      return `[Advanced Scalability: ${lastTurn.ciuTopic.name}] - ${advancedQ}`;
+    }
   }
 
   // 2.5 Digital Profile Grounding: Probe previously identified growth areas from persistent profile
@@ -1755,14 +1894,20 @@ export function scoreAnswer(
     .filter((term) => term.length > 4)
     .slice(0, 14);
   const relevanceHits = relevantTerms.filter((term) => normalized.includes(term)).length;
-  const structureMarkers = ["first", "second", "because", "result", "impact", "tradeoff", "therefore"].filter(
-    (marker) => normalized.includes(marker)
-  ).length;
   const fillerHits = paceStats
     ? paceStats.fillerWordsCount
     : ["um", "uh", "like", "basically", "actually", "maybe"].filter((word) => words.includes(word)).length;
 
-  const { weakArea, retrievedConcepts, depthScore, adaptiveStrategy } = diagnoseTechnicalDepth(
+  const {
+    weakArea,
+    retrievedConcepts,
+    depthScore,
+    adaptiveStrategy,
+    ciuTopic,
+    probingQuestion,
+    missedCriteria,
+    strongSignalsFound,
+  } = diagnoseTechnicalDepth(
     question,
     answer,
     keywords
@@ -1888,6 +2033,10 @@ export function scoreAnswer(
     retrievedConcepts,
     technicalDepthScore: depthScore,
     adaptiveStrategy,
+    ciuTopic,
+    probingQuestion,
+    missedCriteria,
+    strongSignalsFound,
     currentDifficulty: nextDifficulty,
     difficultyTrend,
     difficultyReason,

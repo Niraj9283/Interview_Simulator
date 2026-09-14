@@ -33,6 +33,7 @@ next-dev*.log
 
 # local verification artifacts
 /artifacts/
+/scratch/
 
 # env files (can opt-in for committing if needed)
 .env*

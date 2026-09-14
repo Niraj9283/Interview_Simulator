@@ -46,6 +46,11 @@ export interface EyeContactResult {
   };
   gazeDeviation: number;
   status: "looking" | "distracted" | "no_face" | "eyes_closed" | "initializing";
+  // Defensible CV Engagement metrics
+  cameraEngagementLevel: "High" | "Medium" | "Low";
+  gazeClassification: "Looking at camera" | "Looking slightly away" | "Looking far away" | "Face not detected";
+  headOrientationLabel: "Good" | "Slight Turn" | "Looking Away";
+  significantGazeBreaks: number;
 }
 
 export type EyeContactCallback = (result: EyeContactResult) => void;
@@ -117,6 +122,10 @@ export class EyeContactTracker {
   private onResultCallback: EyeContactCallback | null = null;
   private animFrameId: number | null = null;
   private lastProcessedTimestamp = 0;
+  private lastDetectTime = 0;
+  private isProcessingFrame = false;
+  private downscaleCanvas: HTMLCanvasElement | null = null;
+  private downscaleCtx: CanvasRenderingContext2D | null = null;
 
   // Longitudinal turn statistics
   private facingCameraFrames = 0;
@@ -133,6 +142,14 @@ export class EyeContactTracker {
 
   constructor(windowSize = 30) {
     this.historyMaxSize = windowSize;
+  }
+
+  private isMobileDevice(): boolean {
+    if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      window.innerWidth <= 768
+    );
   }
 
   public async initialize(): Promise<boolean> {
@@ -175,22 +192,28 @@ export class EyeContactTracker {
             modelAssetPath,
             delegate: "GPU",
           },
-          runningMode: "VIDEO",
-          numFaces: 2,
           outputFaceBlendshapes: false,
           outputFacialTransformationMatrixes: false,
+          runningMode: "VIDEO",
+          numFaces: 2,
+          minFaceDetectionConfidence: 0.5,
+          minFacePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
         });
-      } catch (gpuError) {
-        console.warn("GPU delegate failed for FaceLandmarker, falling back to CPU:", gpuError);
+      } catch (gpuErr) {
+        console.warn("MediaPipe GPU delegate unavailable; falling back to CPU", gpuErr);
         this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath,
             delegate: "CPU",
           },
-          runningMode: "VIDEO",
-          numFaces: 2,
           outputFaceBlendshapes: false,
           outputFacialTransformationMatrixes: false,
+          runningMode: "VIDEO",
+          numFaces: 2,
+          minFaceDetectionConfidence: 0.5,
+          minFacePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
         });
       }
 
@@ -210,6 +233,8 @@ export class EyeContactTracker {
     this.blinkCounter = 0;
     this.lastVideoTime = -1;
     this.lastProcessedTimestamp = 0;
+    this.lastDetectTime = 0;
+    this.isProcessingFrame = false;
 
     const processLoop = () => {
       if (!videoElement || videoElement.paused || videoElement.ended) {
@@ -217,23 +242,31 @@ export class EyeContactTracker {
         return;
       }
 
+      const now = performance.now();
+      const mobile = this.isMobileDevice();
+      // Adaptive mobile throttling: 130ms on phone (~7.5 FPS), 80ms on desktop (~12 FPS)
+      const targetInterval = mobile ? 130 : 80;
+
       if (
         this.isInitialized &&
         this.faceLandmarker &&
         videoElement.readyState >= 2 &&
         videoElement.videoWidth > 0 &&
-        videoElement.videoHeight > 0
+        videoElement.videoHeight > 0 &&
+        !this.isProcessingFrame &&
+        now - this.lastDetectTime >= targetInterval
       ) {
-        if (videoElement.currentTime !== this.lastVideoTime) {
-          this.lastVideoTime = videoElement.currentTime;
-          try {
-            const result = this.processFrame(videoElement);
-            if (this.onResultCallback && result) {
-              this.onResultCallback(result);
-            }
-          } catch {
-            // Ignore transient frame detection errors
+        this.lastDetectTime = now;
+        this.isProcessingFrame = true;
+        try {
+          const result = this.processFrame(videoElement, mobile);
+          if (this.onResultCallback && result) {
+            this.onResultCallback(result);
           }
+        } catch {
+          // Ignore transient frame detection errors
+        } finally {
+          this.isProcessingFrame = false;
         }
       }
 
@@ -250,12 +283,15 @@ export class EyeContactTracker {
     }
     this.history = [];
     this.onResultCallback = null;
+    this.isProcessingFrame = false;
   }
 
   public reset() {
     this.history = [];
     this.blinkCounter = 0;
     this.lastProcessedTimestamp = 0;
+    this.lastDetectTime = 0;
+    this.isProcessingFrame = false;
   }
 
   private getEmptyResult(
@@ -293,10 +329,14 @@ export class EyeContactTracker {
       },
       gazeDeviation: 1.0,
       status,
+      cameraEngagementLevel: "Low",
+      gazeClassification: faceDetected ? "Looking slightly away" : "Face not detected",
+      headOrientationLabel: "Looking Away",
+      significantGazeBreaks: this.lookingAwayEventsCount,
     };
   }
 
-  private processFrame(videoElement: HTMLVideoElement): EyeContactResult {
+  private processFrame(videoElement: HTMLVideoElement, mobile = false): EyeContactResult {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const landmarker = this.faceLandmarker as any;
     if (!landmarker) {
@@ -309,12 +349,27 @@ export class EyeContactTracker {
     }
     this.lastProcessedTimestamp = now;
 
+    // Lightweight offscreen downscaling: mobile cameras stream at 1080p/4K which freezes CPU
+    let inputSource: HTMLVideoElement | HTMLCanvasElement = videoElement;
+    if (mobile || videoElement.videoWidth > 420) {
+      if (!this.downscaleCanvas) {
+        this.downscaleCanvas = document.createElement("canvas");
+        this.downscaleCanvas.width = 320;
+        this.downscaleCanvas.height = 240;
+        this.downscaleCtx = this.downscaleCanvas.getContext("2d", { willReadFrequently: true });
+      }
+      if (this.downscaleCtx && this.downscaleCanvas) {
+        this.downscaleCtx.drawImage(videoElement, 0, 0, 320, 240);
+        inputSource = this.downscaleCanvas;
+      }
+    }
+
     let detections: {
       faceLandmarks?: Array<Array<{ x: number; y: number; z: number }>>;
     } | null = null;
 
     try {
-      detections = landmarker.detectForVideo(videoElement, now);
+      detections = landmarker.detectForVideo(inputSource, now);
     } catch {
       return this.getEmptyResult("no_face");
     }
@@ -525,6 +580,19 @@ export class EyeContactTracker {
       expressionDistribution,
       gazeDeviation: Number(deviation.toFixed(3)),
       status: isLooking ? "looking" : "distracted",
+      cameraEngagementLevel: smoothedScore >= 75 ? "High" : smoothedScore >= 50 ? "Medium" : "Low",
+      gazeClassification: isLooking
+        ? "Looking at camera"
+        : deviation < 0.28
+        ? "Looking slightly away"
+        : "Looking far away",
+      headOrientationLabel:
+        Math.abs(yawDeg) < 14 && Math.abs(pitchDeg) < 12
+          ? "Good"
+          : Math.abs(yawDeg) < 25
+          ? "Slight Turn"
+          : "Looking Away",
+      significantGazeBreaks: this.lookingAwayEventsCount,
     };
   }
 
