@@ -14,36 +14,130 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import chromadb
-from chromadb.config import Settings
-import pypdf
+try:
+    import chromadb
+    from chromadb.config import Settings
+    HAS_CHROMADB = True
+except Exception:
+    chromadb = None
+    Settings = None
+    HAS_CHROMADB = False
+
+try:
+    import pypdf
+    HAS_PYPDF = True
+except Exception:
+    pypdf = None
+    HAS_PYPDF = False
 
 
-CHROMA_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "chroma_db"
-CHROMA_DATA_DIR.mkdir(parents=True, exist_ok=True)
+def _get_chroma_data_dir() -> Path:
+    default_dir = Path(__file__).resolve().parents[2] / "data" / "chroma_db"
+    try:
+        default_dir.mkdir(parents=True, exist_ok=True)
+        test_file = default_dir / ".write_test"
+        test_file.touch()
+        test_file.unlink()
+        return default_dir
+    except (OSError, PermissionError):
+        tmp_dir = Path("/tmp/chroma_db")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        return tmp_dir
+
+
+class InMemoryCollection:
+    """Lightweight in-memory vector/keyword collection for serverless environments."""
+    def __init__(self, name: str, metadata: dict[str, Any] | None = None) -> None:
+        self.name = name
+        self.metadata = metadata or {}
+        self.items: dict[str, dict[str, Any]] = {}
+
+    def count(self) -> int:
+        return len(self.items)
+
+    def get(self) -> dict[str, list[Any]]:
+        ids = list(self.items.keys())
+        docs = [self.items[i]["document"] for i in ids]
+        metas = [self.items[i]["metadata"] for i in ids]
+        return {"ids": ids, "documents": docs, "metadatas": metas}
+
+    def delete(self, ids: list[str]) -> None:
+        for item_id in ids:
+            self.items.pop(item_id, None)
+
+    def add(self, ids: list[str], documents: list[str], metadatas: list[dict[str, Any]] | None = None) -> None:
+        if metadatas is None:
+            metadatas = [{}] * len(ids)
+        for item_id, doc, meta in zip(ids, documents, metadatas):
+            self.items[item_id] = {
+                "id": item_id,
+                "document": doc,
+                "metadata": meta or {},
+            }
+
+    def query(self, query_texts: list[str], n_results: int = 3) -> dict[str, list[list[Any]]]:
+        if not self.items or not query_texts:
+            return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+
+        query_text = query_texts[0].lower()
+        q_tokens = set(re.findall(r"\w+", query_text))
+
+        scored: list[tuple[float, str, str, dict[str, Any]]] = []
+        for item_id, item in self.items.items():
+            doc = item["document"]
+            doc_lower = doc.lower()
+            doc_tokens = set(re.findall(r"\w+", doc_lower))
+            overlap = len(q_tokens & doc_tokens)
+            meta_str = " ".join(str(v).lower() for v in item["metadata"].values())
+            meta_tokens = set(re.findall(r"\w+", meta_str))
+            overlap += len(q_tokens & meta_tokens) * 2
+
+            score = 1.0 - (overlap / (max(len(q_tokens), 1) + 2))
+            scored.append((max(score, 0.05), item_id, doc, item["metadata"]))
+
+        scored.sort(key=lambda x: x[0])
+        top = scored[:n_results]
+
+        return {
+            "ids": [[x[1] for x in top]],
+            "documents": [[x[2] for x in top]],
+            "metadatas": [[x[3] for x in top]],
+            "distances": [[x[0] for x in top]],
+        }
 
 
 class RAGEngine:
     def __init__(self) -> None:
-        # Initialize persistent Chroma client
-        self.client = chromadb.PersistentClient(
-            path=str(CHROMA_DATA_DIR),
-            settings=Settings(anonymized_telemetry=False, allow_reset=True),
-        )
+        self.candidate_collection: Any = None
+        self.interview_collection: Any = None
+        self.technical_collection: Any = None
 
-        # 3 Dedicated Collections as specified
-        self.candidate_collection = self.client.get_or_create_collection(
-            name="candidate_knowledge",
-            metadata={"description": "Candidate resume chunks, projects, skills, and experience"},
-        )
-        self.interview_collection = self.client.get_or_create_collection(
-            name="interview_knowledge",
-            metadata={"description": "Interview question bank across behavioral, system design, DSA, and HR"},
-        )
-        self.technical_collection = self.client.get_or_create_collection(
-            name="technical_knowledge",
-            metadata={"description": "Deep technical knowledge rubrics for Python, ML, DL, RAG, LLMs, SQL"},
-        )
+        if HAS_CHROMADB and chromadb is not None:
+            try:
+                chroma_dir = _get_chroma_data_dir()
+                self.client = chromadb.PersistentClient(
+                    path=str(chroma_dir),
+                    settings=Settings(anonymized_telemetry=False, allow_reset=True),
+                )
+                self.candidate_collection = self.client.get_or_create_collection(
+                    name="candidate_knowledge",
+                    metadata={"description": "Candidate resume chunks, projects, skills, and experience"},
+                )
+                self.interview_collection = self.client.get_or_create_collection(
+                    name="interview_knowledge",
+                    metadata={"description": "Interview question bank across behavioral, system design, DSA, and HR"},
+                )
+                self.technical_collection = self.client.get_or_create_collection(
+                    name="technical_knowledge",
+                    metadata={"description": "Deep technical knowledge rubrics for Python, ML, DL, RAG, LLMs, SQL"},
+                )
+            except Exception as err:
+                print(f"[RAGEngine] ChromaDB initialization failed ({err}), falling back to in-memory collections.")
+
+        if self.candidate_collection is None:
+            self.candidate_collection = InMemoryCollection("candidate_knowledge")
+            self.interview_collection = InMemoryCollection("interview_knowledge")
+            self.technical_collection = InMemoryCollection("technical_knowledge")
 
         # Pre-seed default collections if empty
         self._ensure_seeded()
@@ -56,13 +150,21 @@ class RAGEngine:
 
     def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """Extract text from uploaded PDF resume."""
-        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-        extracted_pages = []
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text:
-                extracted_pages.append(text)
-        return "\n\n".join(extracted_pages)
+        if not HAS_PYPDF or pypdf is None:
+            try:
+                return pdf_bytes.decode("utf-8", errors="ignore")
+            except Exception:
+                return ""
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            extracted_pages = []
+            for i, page in enumerate(reader.pages):
+                text = page.extract_text()
+                if text:
+                    extracted_pages.append(text)
+            return "\n\n".join(extracted_pages)
+        except Exception:
+            return ""
 
     def extract_text_from_docx(self, docx_bytes: bytes) -> str:
         """Extract text from uploaded DOCX resume using zipfile & XML."""
