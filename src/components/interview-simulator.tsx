@@ -18,6 +18,7 @@ import {
   FastForward,
   Fingerprint,
   FlaskConical,
+  FlipHorizontal2,
   Gauge,
   Info,
   Award,
@@ -37,7 +38,6 @@ import {
   Square,
   Sun,
   Target,
-  Thermometer,
   Timer,
   TrendingUp,
   Trophy,
@@ -169,19 +169,6 @@ import { getNextInterviewQuestion } from "@/lib/question-service";
 
 type Stage = "setup" | "live" | "complete";
 type PanelTheme = "light" | "dark";
-type TimeMode = "12" | "24";
-
-type WeatherState = {
-  status: "loading" | "ready" | "unavailable";
-  temperature: number | null;
-  label: string;
-};
-
-type OpenMeteoCurrentResponse = {
-  current?: {
-    temperature_2m?: number;
-  };
-};
 
 const initialProfile: CandidateProfile = {
   name: "Candidate",
@@ -215,12 +202,6 @@ const departmentIcons: Record<DepartmentId, typeof Users> = {
   Marketing: Activity,
 };
 
-const DEFAULT_WEATHER_LOCATION = {
-  latitude: 28.6139,
-  longitude: 77.209,
-  label: "New Delhi",
-};
-
 export default function InterviewSimulator() {
   const [profile, setProfile] = useState<CandidateProfile>(initialProfile);
   const [panelTheme, setPanelTheme] = useState<PanelTheme>("light");
@@ -231,6 +212,7 @@ export default function InterviewSimulator() {
   const [answer, setAnswer] = useState("");
   const [history, setHistory] = useState<InterviewTurn[]>([]);
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraMirrored, setCameraMirrored] = useState(true);
   const [micEnabled, setMicEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [eyeContact, setEyeContact] = useState(0);
@@ -406,6 +388,17 @@ export default function InterviewSimulator() {
   const audioStreamRef = useRef<MediaStream | null>(null);
   const preferencesLoadedRef = useRef(false);
 
+  // Synchronous telemetry refs to eliminate high-frequency React re-renders while keeping evaluation 100% fresh
+  const latestVoiceSignalRef = useRef<VoiceSignal>({
+    energy: 0,
+    pace: 0,
+    steadiness: 70,
+    db: -100,
+    rms: 0,
+  });
+  const latestEyeContactRef = useRef<number>(0);
+  const latestEyeContactResultRef = useRef<EyeContactResult | null>(null);
+
   const availableRoles = useMemo(() => getRolesForDepartment(profile.department), [profile.department]);
   const availableTracks = useMemo(() => getAvailableTracks(profile.department), [profile.department]);
   const keywords = useMemo(
@@ -497,11 +490,15 @@ export default function InterviewSimulator() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const storedTheme = window.localStorage.getItem("mockmate-panel-theme");
+      const storedMirror = window.localStorage.getItem("mockmate-camera-mirrored");
 
       preferencesLoadedRef.current = true;
 
       if (storedTheme === "light" || storedTheme === "dark") {
         setPanelTheme(storedTheme);
+      }
+      if (storedMirror !== null) {
+        setCameraMirrored(storedMirror === "true");
       }
     }, 0);
 
@@ -574,6 +571,9 @@ export default function InterviewSimulator() {
 
         tracker.start(videoRef.current, (result) => {
           if (!isCancelled) {
+            latestEyeContactRef.current = result.score;
+            latestEyeContactResultRef.current = result;
+
             if (integrityTrackerRef.current) {
               integrityTrackerRef.current.updateFaceTelemetry(
                 result.facesCount,
@@ -582,11 +582,11 @@ export default function InterviewSimulator() {
                 result.headPose.yaw
               );
             }
-            // Throttle React state updates to avoid continuous 60fps re-rendering of entire component
+            // Throttle React state updates to ~3-4 FPS or status changes to eliminate continuous re-rendering
             const now = performance.now();
-            const scoreChanged = Math.abs(result.score - lastScore) >= 3;
-            const statusChanged = result.cameraEngagementLevel !== lastStatus;
-            if ((scoreChanged || statusChanged || now - lastEyeDispatch > 250) && now - lastEyeDispatch > 110) {
+            const scoreChanged = Math.abs(result.score - lastScore) >= 6;
+            const statusChanged = result.cameraEngagementLevel !== lastStatus || result.status !== (latestEyeContactResultRef.current?.status ?? "");
+            if ((scoreChanged || statusChanged || now - lastEyeDispatch > 300) && now - lastEyeDispatch > 220) {
               lastEyeDispatch = now;
               lastScore = result.score;
               lastStatus = result.cameraEngagementLevel;
@@ -737,7 +737,7 @@ export default function InterviewSimulator() {
           facingMode: "user",
           width: { ideal: isMobile ? 480 : 640, max: isMobile ? 640 : 1280 },
           height: { ideal: isMobile ? 360 : 480, max: isMobile ? 480 : 720 },
-          frameRate: { ideal: isMobile ? 20 : 24, max: 30 },
+          frameRate: { ideal: 30, max: 30 },
         },
       });
       videoStreamRef.current = stream;
@@ -768,6 +768,8 @@ export default function InterviewSimulator() {
     setCameraEnabled(false);
     setEyeContact(0);
     setEyeContactResult(null);
+    latestEyeContactRef.current = 0;
+    latestEyeContactResultRef.current = null;
   }
 
   async function toggleMic() {
@@ -801,10 +803,11 @@ export default function InterviewSimulator() {
       let lastEnergy = -1;
 
       voiceAnalyzerRef.current.start(stream, (signal) => {
+        latestVoiceSignalRef.current = signal;
         speechTrackerRef.current?.updateVoiceActivity(signal.isSpeaking);
         const now = performance.now();
-        const energyChanged = Math.abs(signal.energy - lastEnergy) >= 3;
-        if ((energyChanged || now - lastVoiceDispatch > 220) && now - lastVoiceDispatch > 85) {
+        const energyChanged = Math.abs(signal.energy - lastEnergy) >= 6;
+        if ((energyChanged || now - lastVoiceDispatch > 280) && now - lastVoiceDispatch > 180) {
           lastVoiceDispatch = now;
           lastEnergy = signal.energy;
           setVoiceSignal(signal);
@@ -838,6 +841,7 @@ export default function InterviewSimulator() {
     audioStreamRef.current = null;
     setMicEnabled(false);
     setIsRecording(false);
+    latestVoiceSignalRef.current = { energy: 0, pace: 60, steadiness: 60, db: -100, rms: 0 };
     setVoiceSignal({ energy: 0, pace: 60, steadiness: 60, db: -100, rms: 0 });
     setSpeechState({
       isListening: false,
@@ -890,8 +894,8 @@ export default function InterviewSimulator() {
     const rawTranscript = speechState.transcript || speechState.interimTranscript || answer || "I trained a Random Forest model using PyTorch and PostgreSQL to optimize data processing pipelines.";
     const speechSec = Math.max(1, voiceRecordingSeconds);
     const wpm = speechState.wpm > 0 ? speechState.wpm : Math.round((rawTranscript.split(/\s+/).filter(Boolean).length / speechSec) * 60);
-    const avgEnergy = voiceSignal.energy > 0 ? voiceSignal.energy : 76;
-    const eyeAvg = eyeContact > 0 ? eyeContact : 82;
+    const avgEnergy = latestVoiceSignalRef.current.energy > 0 ? latestVoiceSignalRef.current.energy : (voiceSignal.energy > 0 ? voiceSignal.energy : 76);
+    const eyeAvg = latestEyeContactRef.current > 0 ? latestEyeContactRef.current : (eyeContact > 0 ? eyeContact : 82);
     const pauses = speechState.pauseCount;
     const fillers = speechState.totalFillers;
 
@@ -968,8 +972,8 @@ export default function InterviewSimulator() {
       trimmedAnswer,
       currentQuestion,
       keywords,
-      voiceSignal,
-      cameraEnabled ? eyeContact : 54,
+      latestVoiceSignalRef.current || voiceSignal,
+      cameraEnabled ? (latestEyeContactRef.current || eyeContact) : 54,
       turnVoiceStats,
       turnPaceStats,
       dynamicDifficulty,
@@ -1065,10 +1069,10 @@ export default function InterviewSimulator() {
 
     // Multi-Aspect Intelligent Evaluation (6 Independent Evaluators + Score Explanation + Calibration)
     const multiAspectResult = evaluateAnswerMultiAspect(currentQuestion, trimmedAnswer, {
-      eyeContact: eyeContactResult?.score ?? eyeContact,
+      eyeContact: latestEyeContactRef.current || eyeContactResult?.score || eyeContact,
       wpm: speechState.wpm,
       fillerWords: speechState.totalFillers,
-      volumeConsistency: voiceSignal.steadiness,
+      volumeConsistency: latestVoiceSignalRef.current.steadiness || voiceSignal.steadiness,
     });
     const confidenceCalibration = computeConfidenceCalibration(
       multiAspectResult.scores.confidenceScore,
@@ -1350,326 +1354,29 @@ export default function InterviewSimulator() {
     <main className="interview-shell relative min-h-screen bg-transparent text-zinc-950" data-panel-theme={panelTheme}>
 
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-4 px-4 py-4 lg:px-6">
-        <header className="flex flex-col gap-3 border-b border-fuchsia-400/20 pb-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-md bg-zinc-950 text-white shadow-[0_0_24px_rgba(236,72,153,0.25)] border border-fuchsia-500/30">
+        <header className="flex flex-col gap-3 border-b border-fuchsia-400/20 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-lg bg-zinc-950 text-white shadow-[0_0_24px_rgba(236,72,153,0.25)] border border-fuchsia-500/30">
               <BrainCircuit size={24} strokeWidth={1.8} />
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-normal text-white">MockMate AI</h1>
               <p className="text-sm text-fuchsia-100/80">Real-time interview simulator</p>
             </div>
-
-            {/* Platform Dropdown Menu in Top-Left Corner with App-Suited Icon */}
-            <div className="relative ml-1 sm:ml-3" ref={toolsDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setShowToolsDropdown((prev) => !prev)}
-                className="flex h-11 items-center gap-2.5 rounded-lg border border-fuchsia-400/30 bg-[#241044]/90 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.2)] backdrop-blur transition hover:border-fuchsia-300/70 hover:bg-[#2e1554] cursor-pointer"
-                title="Open AI Platform Suite & System Telemetry Menu"
-                aria-expanded={showToolsDropdown}
-              >
-                <Sparkles size={16} className="text-amber-400 animate-pulse" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1.5">
-                    Platform Suite
-                    <span className="rounded bg-fuchsia-500/25 px-1 text-[9px] font-mono text-fuchsia-200">
-                      8 Tools
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">
-                    {executionMode === "edge" ? "Edge AI (0ms)" : "Cloud API"} · {integrityState.integrityScore}%
-                  </span>
-                </div>
-                <ChevronDown
-                  size={14}
-                  className={`ml-1 text-fuchsia-300 transition-transform duration-200 ${
-                    showToolsDropdown ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showToolsDropdown && (
-                <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-fuchsia-400/30 bg-[#170a2c]/98 p-2.5 text-white shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 space-y-1">
-                  <div className="px-2.5 py-1.5 border-b border-fuchsia-400/20 mb-1 flex items-center justify-between">
-                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fuchsia-300 flex items-center gap-1.5">
-                      <BrainCircuit size={13} className="text-fuchsia-400" />
-                      Platform Intelligence Suite
-                    </span>
-                    <span className="text-[10px] text-fuchsia-200/60 font-mono">MockMate v2.4</span>
-                  </div>
-
-                  {/* 1. Edge AI Mode Toggle */}
-                  <div
-                    onClick={() => setExecutionMode((prev) => (prev === "edge" ? "cloud" : "edge"))}
-                    className="flex items-center justify-between rounded-lg p-2 transition hover:bg-fuchsia-500/15 cursor-pointer group"
-                    title={`Click to switch to ${executionMode === "edge" ? "Cloud Mode" : "Edge AI Mode"}`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
-                        {executionMode === "edge" ? (
-                          <Zap size={16} className="text-amber-400 animate-pulse" />
-                        ) : (
-                          <Wifi size={16} className="text-sky-300" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-white group-hover:text-amber-200">
-                            {executionMode === "edge" ? "Edge AI Mode" : "Cloud Mode"}
-                          </span>
-                          <span className="text-[9px] font-mono px-1 rounded bg-amber-400/20 text-amber-300">
-                            Toggle
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-fuchsia-200/70">
-                          {executionMode === "edge" ? "Air-Gapped Laptop" : "Remote Server API"}
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                        executionMode === "edge"
-                          ? "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
-                          : "bg-sky-400/20 text-sky-200 border border-sky-400/30"
-                      }`}
-                    >
-                      {executionMode === "edge" ? "0ms" : "API"}
-                    </span>
-                  </div>
-
-                  {/* 2. Edge AI Topology */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEdgeModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
-                    title="Inspect Edge AI Architecture & Topology"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
-                        <Cpu size={16} className="text-amber-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-amber-200">
-                          Edge AI Topology
-                        </span>
-                        <span className="text-[10px] text-fuchsia-200/70">
-                          Air-Gapped Laptop Architecture
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1.5 py-0.5 text-[9px] font-mono border border-amber-400/30">
-                      Topology
-                    </span>
-                  </button>
-
-                  {/* 3. Interview Integrity */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowIntegrityModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
-                    title="Inspect Anti-Cheating & Interview Integrity Telemetry"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-emerald-400/10 border border-emerald-400/30">
-                        <ShieldCheck
-                          size={16}
-                          className={integrityState.integrityScore < 75 ? "text-amber-400" : "text-emerald-400"}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-emerald-200">
-                          Interview Integrity
-                        </span>
-                        <span className="text-[10px] text-fuchsia-200/70">
-                          {integrityState.integrityLevel} · Proctoring Telemetry
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold border ${
-                        integrityState.integrityScore >= 85
-                          ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/30"
-                          : "bg-amber-400/20 text-amber-300 border-amber-400/30"
-                      }`}
-                    >
-                      {integrityState.integrityScore}%
-                    </span>
-                  </button>
-
-                  {/* 4. Digital Profile */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
-                    title="View Persistent Candidate Digital Profile & Mastery Vectors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-purple-400/10 border border-purple-400/30">
-                        <Fingerprint size={16} className="text-purple-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-purple-200">
-                          Digital Profile
-                        </span>
-                        <span className="text-[10px] text-fuchsia-200/70">
-                          {digitalProfile.sessionsCompleted} Sessions Tracked
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-purple-400/20 text-purple-300 px-1.5 py-0.5 text-[9px] font-mono border border-purple-400/30">
-                      {digitalProfile.overallReadiness}%
-                    </span>
-                  </button>
-
-                  {/* 5. Longitudinal Benchmark */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!activeBenchmark) {
-                        setActiveBenchmark(computeSessionBenchmark(history, profile, digitalProfile));
-                      }
-                      setShowBenchmarkModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-fuchsia-500/15 cursor-pointer group"
-                    title="View Longitudinal Benchmark & Cohort Progress"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-amber-400/10 border border-amber-400/30">
-                        <Trophy size={16} className="text-amber-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-amber-200">
-                          Benchmark Cohort
-                        </span>
-                        <span className="text-[10px] text-fuchsia-200/70">
-                          4 Attempts · +18pts Progress
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1.5 py-0.5 text-[9px] font-mono border border-amber-400/30">
-                      Top 14%
-                    </span>
-                  </button>
-
-                  {/* 6. CIU Knowledge Graph */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCiuGraphModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-cyan-500/15 cursor-pointer group"
-                    title="Browse Coding Interview University (CIU) Knowledge Graph & Rubrics"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-cyan-400/10 border border-cyan-400/30">
-                        <BookOpen size={16} className="text-cyan-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-cyan-200">
-                          CIU Knowledge Graph
-                        </span>
-                        <span className="text-[10px] text-cyan-200/70">
-                          CS Curriculum & Rubrics
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-cyan-400/20 text-cyan-300 px-1.5 py-0.5 text-[9px] font-mono border border-cyan-400/30">
-                      {CIU_KNOWLEDGE_GRAPH.length} Topics
-                    </span>
-                  </button>
-
-                  {/* 7. Candidate Skill Graph */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSkillGraphModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-pink-500/15 cursor-pointer group"
-                    title="View Resume vs CIU Competency Graph & Detected Weaknesses"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-pink-400/10 border border-pink-400/30">
-                        <BrainCircuit size={16} className="text-pink-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-pink-200">
-                          Candidate Skill Graph
-                        </span>
-                        <span className="text-[10px] text-pink-200/70">
-                          {candidateSkillGraph.weaknesses.length} Gaps Targeted
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-pink-400/20 text-pink-300 px-1.5 py-0.5 text-[9px] font-mono border border-pink-400/30">
-                      {candidateSkillGraph.overallSkillScore}%
-                    </span>
-                  </button>
-
-                  {/* 8. Interview Readiness */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowReadinessModal(true);
-                      setShowToolsDropdown(false);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg p-2 text-left transition hover:bg-emerald-500/15 cursor-pointer group"
-                    title="View Interview Readiness Progress & Past Session History"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="grid size-8 place-items-center rounded-md bg-emerald-400/10 border border-emerald-400/30">
-                        <TrendingUp size={16} className="text-emerald-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-white group-hover:text-emerald-200">
-                          Interview Readiness
-                        </span>
-                        <span className="text-[10px] text-emerald-200/70">
-                          {readinessSummary.deltaVsPrevious >= 0 ? `+${readinessSummary.deltaVsPrevious}` : readinessSummary.deltaVsPrevious} pts delta
-                        </span>
-                      </div>
-                    </div>
-                    <span className="rounded bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 text-[9px] font-mono border border-emerald-400/30">
-                      {readinessSummary.overallReadiness}/100
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
-          <div className="flex flex-col gap-2 lg:items-end">
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              <ThemeToggle theme={panelTheme} onThemeChange={setPanelTheme} />
-              <TimeWeatherPanel />
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <StatusPill icon={CurrentDepartmentIcon} label={getDepartmentLabel(profile.department)} />
-              <StatusPill icon={CurrentDomainIcon} label={profile.domain} />
+
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <div className="flex items-center gap-2">
+              <StatusPill icon={CurrentDomainIcon} label={profile.targetRole || profile.domain} />
               <StatusPill icon={Gauge} label={`Diff: ${dynamicDifficulty}`} />
               <StatusPill
-                icon={executionMode === "edge" ? ShieldCheck : Wifi}
-                label={executionMode === "edge" ? "Edge: Air-Gapped" : "Cloud: Online"}
+                icon={TrendingUp}
+                label={stage === "complete" ? "Complete" : stage === "live" ? `Q${questionIndex + 1}/6` : "Ready"}
               />
-              <StatusPill icon={TrendingUp} label={stage === "complete" ? "Complete" : `${progress}%`} />
             </div>
+            <ThemeToggle theme={panelTheme} onThemeChange={setPanelTheme} />
           </div>
         </header>
-
-        {showEdgeModal && (
-          <EdgeArchitectureModal telemetry={edgeTelemetry} onClose={() => setShowEdgeModal(false)} />
-        )}
 
         <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <aside className="flex flex-col gap-4 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
@@ -1782,35 +1489,11 @@ export default function InterviewSimulator() {
                     ))}
                   </select>
                 </label>
-
-                {/* Candidate Skill Graph Summary Pill (Feature #2) */}
-                <div className="mt-1 rounded-lg border border-pink-200 bg-gradient-to-r from-pink-50/80 to-purple-50/80 p-2.5 space-y-1 text-xs shadow-2xs">
-                  <div className="flex items-center justify-between font-bold text-pink-950">
-                    <span className="flex items-center gap-1.5">
-                      <BrainCircuit size={13} className="text-pink-600" />
-                      Candidate Skill Graph
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowSkillGraphModal(true)}
-                      className="text-[10px] font-bold text-pink-700 hover:underline cursor-pointer"
-                    >
-                      Inspect Graph →
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-emerald-700 font-semibold">{candidateSkillGraph.strengths.length} Strengths</span>
-                    <span className="text-rose-700 font-bold">{candidateSkillGraph.weaknesses.length} Gap Areas</span>
-                  </div>
-                  <div className="text-[10px] text-zinc-600 font-mono truncate">
-                    Priority Gaps: {candidateSkillGraph.priorityInterviewTopics.slice(0, 3).join(", ")}
-                  </div>
-                </div>
               </div>
             </section>
 
             <section>
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-2.5 flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">
                   Resume (Optional)
                 </h2>
@@ -1825,51 +1508,31 @@ export default function InterviewSimulator() {
                 )}
               </div>
 
-              {isResumeUploaded ? (
-                <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/90 p-2.5 text-xs text-emerald-950 shadow-2xs">
-                  <div className="flex items-center justify-between font-bold text-emerald-900">
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 size={15} className="text-emerald-600" />
-                      Resume Mode Active
-                    </span>
-                    <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Tailored to Resume
+              {isResumeUploaded && (
+                <div className="mb-2.5 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs text-emerald-950 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                    <span className="truncate">
+                      Resume active: <span className="font-semibold underline">{resumeFileName}</span>
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-emerald-800">
-                    Questions will strictly probe projects, tech stack, and experiences in:{" "}
-                    <span className="font-semibold underline">{resumeFileName}</span>.
-                  </p>
-                </div>
-              ) : (
-                <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50/90 p-2.5 text-xs text-blue-950 shadow-2xs">
-                  <div className="flex items-center justify-between font-bold text-blue-900">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles size={15} className="text-blue-600" />
-                      Position Mode Active
-                    </span>
-                    <span className="rounded bg-blue-200/80 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
-                      Role Curated
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-blue-800">
-                    No resume uploaded. Questions will be strictly based on your selected role:{" "}
-                    <span className="font-semibold underline">{profile.targetRole}</span> ({profile.department}).
-                  </p>
+                  <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 shrink-0">
+                    Tailored
+                  </span>
                 </div>
               )}
 
-              <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 text-center transition hover:border-emerald-500 hover:bg-emerald-50">
-                <Upload size={22} className="text-emerald-700" />
-                <span className="max-w-full truncate text-sm font-medium text-zinc-800">
+              <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-3 text-center transition hover:border-emerald-500 hover:bg-emerald-50">
+                <Upload size={20} className="text-emerald-700" />
+                <span className="max-w-full truncate text-xs font-medium text-zinc-800">
                   {isUploadingResume
                     ? "Extracting Text & Indexing..."
                     : isResumeUploaded
                     ? `Replace Resume (${resumeFileName})`
-                    : "Upload Resume (.txt, .pdf, .docx)"}
+                    : "Upload Resume (.pdf, .docx, .txt)"}
                 </span>
-                <span className="text-[11px] text-zinc-500">
-                  Supports .txt, .pdf, .docx, .doc, .md
+                <span className="text-[10.5px] text-zinc-500">
+                  Optional · Questions will tailor to your specific projects
                 </span>
                 <input
                   className="sr-only"
@@ -1881,45 +1544,15 @@ export default function InterviewSimulator() {
                 />
               </label>
 
-              <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
-                <div className="flex items-center justify-between font-semibold text-zinc-800">
-                  <span className="flex items-center gap-1.5 text-emerald-700">
-                    <Database size={13} />
-                    Chroma RAG Collections
-                  </span>
-                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                    {ragStatus?.status === "ready" || ragStatus?.status === "client_active" ? "Active" : "Ready"}
-                  </span>
+              {isResumeUploaded && keywords.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {keywords.slice(0, 5).map((keyword) => (
+                    <span key={keyword} className="rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                      {keyword}
+                    </span>
+                  ))}
                 </div>
-                <div className="grid grid-cols-3 gap-1 pt-1 text-[11px]">
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Candidate</div>
-                    <div className="text-zinc-500 font-mono">
-                      {ragStatus?.collections.candidate_knowledge.count ?? 4} chunks
-                    </div>
-                  </div>
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Interview</div>
-                    <div className="text-zinc-500 font-mono">
-                      {ragStatus?.collections.interview_knowledge.count ?? 9} questions
-                    </div>
-                  </div>
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Technical</div>
-                    <div className="text-zinc-500 font-mono">
-                      {ragStatus?.collections.technical_knowledge.count ?? 8} rubrics
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {keywords.slice(0, 6).map((keyword) => (
-                  <span key={keyword} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
+              )}
             </section>
 
             <section>
@@ -2055,7 +1688,17 @@ export default function InterviewSimulator() {
           <section className="flex min-h-[720px] flex-col overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
             <div className="grid flex-1 grid-rows-[minmax(240px,42vh)_1fr]">
               <div className="relative bg-zinc-950">
-                <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted playsInline />
+                <video
+                  ref={videoRef}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  muted
+                  playsInline
+                  style={{
+                    transform: `${cameraMirrored ? "scaleX(-1) " : ""}translateZ(0)`,
+                    willChange: "transform",
+                  }}
+                />
                 {!cameraEnabled ? (
                   <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_30%,#2f4f4b_0,#101312_42%,#080808_100%)]">
                     <div className="text-center text-white">
@@ -2074,6 +1717,29 @@ export default function InterviewSimulator() {
                   >
                     {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
                   </button>
+                  {cameraEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCameraMirrored((prev) => {
+                          const next = !prev;
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem("mockmate-camera-mirrored", String(next));
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`grid size-10 place-items-center rounded-md shadow-sm backdrop-blur transition ${
+                        cameraMirrored
+                          ? "bg-white/92 text-emerald-700 font-semibold hover:bg-white"
+                          : "bg-white/70 text-zinc-500 hover:bg-white/92"
+                      }`}
+                      aria-label={cameraMirrored ? "Flip camera horizontal (Mirrored view)" : "Flip camera horizontal (Normal view)"}
+                      title={cameraMirrored ? "Camera is mirrored (click to unflip)" : "Camera is unmirrored (click to flip)"}
+                    >
+                      <FlipHorizontal2 size={18} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={toggleMic}
@@ -2211,34 +1877,8 @@ export default function InterviewSimulator() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* A/B Mode Toggle Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsABMode(!isABMode);
-                          if (isABMode && currentAttempt === 2) {
-                            setCurrentAttempt(1);
-                            setPendingAttempt1(null);
-                          }
-                        }}
-                        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition border cursor-pointer ${
-                          isABMode
-                            ? "border-purple-400 bg-purple-100 text-purple-900 shadow-2xs ring-1 ring-purple-400"
-                            : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
-                        }`}
-                        title="A/B Training Mode: Answer each question twice to evaluate side-by-side improvements"
-                      >
-                        <FlaskConical size={13} className={isABMode ? "text-purple-700 animate-pulse" : "text-zinc-500"} />
-                        <span>A/B Training: {isABMode ? "ACTIVE" : "OFF"}</span>
-                        {isABMode && (
-                          <span className="rounded bg-purple-700 px-1 py-0.2 text-[9px] font-mono text-white">
-                            {currentAttempt === 1 ? "Attempt 1/2" : "Attempt 2/2"}
-                          </span>
-                        )}
-                      </button>
-
-                      <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
-                        Q{Math.min(questionIndex + 1, 6)} / 6
+                      <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                        Question {Math.min(questionIndex + 1, 6)} of 6
                       </span>
                       <span
                         className={`rounded-md px-2 py-1 text-xs font-bold font-mono ${
@@ -3131,17 +2771,6 @@ export default function InterviewSimulator() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* A/B Mode Showcase Demo Button */}
-                    <button
-                      type="button"
-                      onClick={openSampleABComparison}
-                      className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-purple-300/80 bg-purple-50 px-3 text-xs font-bold text-purple-900 hover:bg-purple-100 transition shadow-2xs cursor-pointer"
-                      title="Preview A/B Comparison demonstration (+16 Overall, +14 Comm, +17 Tech)"
-                    >
-                      <FlaskConical size={14} className="text-purple-700" />
-                      <span>A/B Demo</span>
-                    </button>
-
                     {/* Replay Interview Button */}
                     <button
                       type="button"
@@ -3324,72 +2953,42 @@ export default function InterviewSimulator() {
                   </div>
                 </section>
 
-                {/* AI Interviewer Persona Selector (Moved into Right Sidebar) */}
-                <section>
-                  <div className="mb-2 flex items-center justify-between">
+                {/* AI Interviewer Persona Selector (Dropdown Menu in Right Sidebar) */}
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">AI Interviewer Persona</h2>
                     <span className="rounded bg-purple-100 text-purple-900 px-2 py-0.5 text-[10px] font-bold font-mono">
                       {activePersona.avatarEmoji} {activePersona.name}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    {INTERVIEWER_PERSONA_LIST.map((persona) => {
-                      const isSelected = (profile.personaId ?? "technical") === persona.id;
 
-                      return (
-                        <button
-                          key={persona.id}
-                          type="button"
-                          onClick={() => updateProfile("personaId", persona.id)}
-                          className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
-                            isSelected
-                              ? "border-purple-600 bg-gradient-to-r from-purple-950 to-slate-900 text-white shadow-md ring-1 ring-purple-500/30"
-                              : "border-zinc-200 bg-white text-zinc-800 hover:border-purple-300 hover:bg-purple-50/40"
-                          }`}
-                        >
-                          {/* Avatar container */}
-                          <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
-                            isSelected
-                              ? "bg-purple-800/60 border border-purple-500/40"
-                              : "bg-zinc-100 group-hover:bg-purple-100/70 border border-zinc-200/80"
-                          }`}>
-                            {persona.avatarEmoji}
-                          </div>
+                  {/* Dropdown Menu */}
+                  <select
+                    value={profile.personaId ?? "technical"}
+                    onChange={(event) => updateProfile("personaId", event.target.value as InterviewerPersonaId)}
+                    className="h-10 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs font-semibold text-zinc-900 outline-none transition focus:border-purple-500 focus:bg-white cursor-pointer"
+                  >
+                    {INTERVIEWER_PERSONA_LIST.map((persona) => (
+                      <option key={persona.id} value={persona.id}>
+                        {persona.avatarEmoji} {persona.name} — {persona.role}
+                      </option>
+                    ))}
+                  </select>
 
-                          {/* Info */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="font-bold text-xs leading-tight truncate">
-                                {persona.name}
-                              </span>
-                              <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
-                                isSelected
-                                  ? "bg-purple-500/30 text-purple-200 border border-purple-400/30"
-                                  : persona.badgeBg
-                              }`}>
-                                {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
-                              </span>
-                            </div>
-                            <p className={`mt-0.5 text-[11px] leading-snug truncate ${
-                              isSelected ? "text-purple-200" : "text-zinc-500"
-                            }`}>
-                              {persona.tagline}
-                            </p>
-                          </div>
-
-                          {/* Selection indicator */}
-                          <div className="shrink-0">
-                            <div className={`size-4 rounded-full border flex items-center justify-center transition ${
-                              isSelected
-                                ? "border-emerald-400 bg-emerald-500 text-white"
-                                : "border-zinc-300 bg-transparent group-hover:border-purple-400"
-                            }`}>
-                              {isSelected && <div className="size-1.5 rounded-full bg-white" />}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                  {/* Compact Active Persona Badge */}
+                  <div className="flex items-center gap-2.5 rounded-xl border border-purple-200/90 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 p-2.5 text-xs shadow-2xs">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white border border-purple-200 text-xl shadow-2xs">
+                      {activePersona.avatarEmoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-xs text-purple-950 truncate">{activePersona.name}</span>
+                        <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${activePersona.badgeBg}`}>
+                          {activePersona.id === "stress_interviewer" ? "Stress Mode" : activePersona.role.split("&")[0].trim()}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[10.5px] text-purple-900/80 leading-tight">{activePersona.tagline}</p>
+                    </div>
                   </div>
 
                   {/* Configurable Stress Mode Settings Panel */}
@@ -3489,66 +3088,6 @@ export default function InterviewSimulator() {
                       </div>
                     </div>
                   )}
-                </section>
-
-                {/* Candidate Persistent Digital Profile Summary Card */}
-                <section className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/60 to-indigo-50/60 p-3 text-xs space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
-                    <div className="flex items-center gap-1.5 font-bold text-purple-950">
-                      <Fingerprint size={15} className="text-purple-600" />
-                      <span>Persistent Digital Profile</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowProfileModal(true)}
-                      className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
-                    >
-                      View Full Profile →
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Technical</div>
-                      <div className="text-xs font-bold text-blue-700">{digitalProfile.pillars.technical.score}%</div>
-                    </div>
-                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Communication</div>
-                      <div className="text-xs font-bold text-emerald-700">{digitalProfile.pillars.communication.score}%</div>
-                    </div>
-                    <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                      <div className="text-[9px] text-zinc-500 font-semibold uppercase">Behavioral</div>
-                      <div className="text-xs font-bold text-purple-700">{digitalProfile.pillars.behavioral.score}%</div>
-                    </div>
-                  </div>
-
-                  {/* Sample Top Key Skills */}
-                  <div className="space-y-1 text-[10.5px] font-mono text-zinc-700">
-                    <div className="flex items-center justify-between text-zinc-500 text-[10px]">
-                      <span>Tracked Skill Vector</span>
-                      <span>Proficiency</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Python</span>
-                      <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Machine Learning</span>
-                      <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>SQL Optimization</span>
-                      <span className="font-bold text-amber-700">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>RAG & LLM Architectures</span>
-                      <span className="font-bold text-rose-700">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] text-purple-900/80 bg-purple-100/60 rounded px-2 py-1 italic">
-                    🧬 Future sessions start from this profile and probe priority growth areas.
-                  </div>
                 </section>
 
                 {stage === "setup" ? (
@@ -3999,182 +3538,6 @@ function ThemeToggle({
   );
 }
 
-function TimeWeatherPanel() {
-  const [timeMode, setTimeMode] = useState<TimeMode>("24");
-  const [now, setNow] = useState<Date | null>(null);
-  const [weather, setWeather] = useState<WeatherState>({
-    status: "loading",
-    temperature: null,
-    label: "Weather",
-  });
-  const preferencesLoadedRef = useRef(false);
-  const date = now ? formatClockDate(now) : "Today";
-  const time = now ? formatClockTime(now, timeMode) : "--:--";
-  const temperature =
-    weather.status === "loading"
-      ? "Loading"
-      : weather.status === "ready" && weather.temperature !== null
-        ? `${Math.round(weather.temperature)} C`
-        : "-- C";
-
-  useEffect(() => {
-    const preferenceTimer = window.setTimeout(() => {
-      const storedTimeMode = window.localStorage.getItem("mockmate-time-mode");
-      preferencesLoadedRef.current = true;
-
-      if (storedTimeMode === "12" || storedTimeMode === "24") {
-        setTimeMode(storedTimeMode);
-      }
-    }, 0);
-
-    return () => window.clearTimeout(preferenceTimer);
-  }, []);
-
-  useEffect(() => {
-    if (preferencesLoadedRef.current) {
-      window.localStorage.setItem("mockmate-time-mode", timeMode);
-    }
-  }, [timeMode]);
-
-  useEffect(() => {
-    const firstTick = window.setTimeout(() => {
-      setNow(new Date());
-    }, 0);
-
-    const timer = window.setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(firstTick);
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-
-    async function loadTemperature(latitude: number, longitude: number, label: string) {
-      try {
-        const params = new URLSearchParams({
-          latitude: String(latitude),
-          longitude: String(longitude),
-          current: "temperature_2m",
-          timezone: "auto",
-        });
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Weather request failed with ${response.status}`);
-        }
-
-        const data = (await response.json()) as OpenMeteoCurrentResponse;
-        const currentTemperature = data.current?.temperature_2m;
-
-        if (!active || typeof currentTemperature !== "number") {
-          return;
-        }
-
-        setWeather({
-          status: "ready",
-          temperature: currentTemperature,
-          label,
-        });
-      } catch (error) {
-        if (!active || controller.signal.aborted) {
-          return;
-        }
-
-        console.warn("Temperature lookup failed:", error);
-        setWeather({
-          status: "unavailable",
-          temperature: null,
-          label: "Weather",
-        });
-      }
-    }
-
-    function loadFallbackTemperature() {
-      void loadTemperature(
-        DEFAULT_WEATHER_LOCATION.latitude,
-        DEFAULT_WEATHER_LOCATION.longitude,
-        DEFAULT_WEATHER_LOCATION.label,
-      );
-    }
-
-    if (!navigator.geolocation) {
-      loadFallbackTemperature();
-    } else {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          void loadTemperature(position.coords.latitude, position.coords.longitude, "Local");
-        },
-        () => loadFallbackTemperature(),
-        { enableHighAccuracy: false, maximumAge: 600000, timeout: 5000 },
-      );
-    }
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, []);
-
-  return (
-    <div className="flex min-h-12 flex-wrap items-center gap-3 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 py-2 text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur">
-      <div className="flex items-center gap-2 pr-1">
-        <Clock3 size={16} className="text-fuchsia-300" />
-        <div>
-          <div className="text-sm font-bold leading-4">{time}</div>
-          <div className="text-[11px] font-medium leading-4 text-fuchsia-100/72">{date}</div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-1 rounded-md bg-black/22 p-1">
-        {(["12", "24"] as TimeMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setTimeMode(mode)}
-            className={`h-7 rounded-md px-2 text-xs font-bold transition ${
-              timeMode === mode ? "bg-fuchsia-400 text-white" : "text-fuchsia-100/78 hover:bg-white/10"
-            }`}
-            aria-label={`Use ${mode}-hour time`}
-          >
-            {mode}h
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-2 border-l border-fuchsia-400/20 pl-3">
-        <Thermometer size={16} className="text-fuchsia-300" />
-        <div>
-          <div className="text-sm font-bold leading-4">{temperature}</div>
-          <div className="text-[11px] font-medium leading-4 text-fuchsia-100/72">{weather.label}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatClockTime(date: Date, mode: TimeMode) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: mode === "12",
-  }).format(date);
-}
-
-function formatClockDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(date);
-}
-
 function CameraSignal({
   label,
   value,
@@ -4198,7 +3561,7 @@ function CameraSignal({
       </div>
       <div className="mt-2 h-1.5 rounded-full bg-zinc-200">
         <div
-          className="h-full rounded-full bg-emerald-600 transition-all"
+          className="h-full rounded-full bg-emerald-600 transition-[width] duration-150 ease-out"
           style={{ width: `${active ? Math.min(100, Math.max(0, value)) : 0}%` }}
         />
       </div>

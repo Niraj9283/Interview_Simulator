@@ -32,17 +32,12 @@ body {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
-  filter: saturate(1.18) contrast(1.05);
   opacity: 1;
   transform: translateZ(0);
   will-change: transform;
 }
 
 @media (max-width: 768px) {
-  .interactive-bg {
-    filter: none !important;
-  }
-
   /* Disable expensive backdrop-filter calculations on mobile GPUs */
   .backdrop-blur,
   .backdrop-blur-sm,

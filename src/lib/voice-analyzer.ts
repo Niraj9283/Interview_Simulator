@@ -55,51 +55,38 @@ function clamp(value: number, min = 0, max = 100): number {
 
 function autoCorrelatePitch(buffer: Float32Array<ArrayBuffer>, sampleRate: number): number {
   let sumOfSquares = 0;
-  for (let i = 0; i < buffer.length; i++) {
+  const len = buffer.length;
+  for (let i = 0; i < len; i += 2) {
     sumOfSquares += buffer[i] * buffer[i];
   }
-  const rootMeanSquare = Math.sqrt(sumOfSquares / buffer.length);
+  const rootMeanSquare = Math.sqrt((sumOfSquares * 2) / len);
   if (rootMeanSquare < 0.015) return -1;
 
-  let r1 = 0;
-  let r2 = buffer.length - 1;
-  const thres = 0.2;
-  for (let i = 0; i < buffer.length / 2; i++) {
-    if (Math.abs(buffer[i]) < thres) {
-      r1 = i;
-      break;
+  // Bounded pitch lag range: human speech fundamental frequency (F0) is 65 Hz to 420 Hz
+  const minLag = Math.max(1, Math.floor(sampleRate / 420));
+  const maxLag = Math.min(len - 2, Math.ceil(sampleRate / 65));
+  if (minLag >= maxLag || maxLag >= len) return -1;
+
+  // Correlate over a fixed evaluation window with step-sampling to eliminate GC and CPU spikes
+  const windowSize = Math.min(512, len - maxLag);
+  let bestVal = -1;
+  let bestLag = -1;
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < windowSize; i += 2) {
+      sum += buffer[i] * buffer[i + lag];
     }
-  }
-  for (let i = 1; i < buffer.length / 2; i++) {
-    if (Math.abs(buffer[buffer.length - i]) < thres) {
-      r2 = buffer.length - i;
-      break;
+    if (sum > bestVal) {
+      bestVal = sum;
+      bestLag = lag;
     }
   }
 
-  const trimmed = buffer.slice(r1, r2);
-  const c = new Array(trimmed.length).fill(0);
-  for (let i = 0; i < trimmed.length; i++) {
-    for (let j = 0; j < trimmed.length - i; j++) {
-      c[i] = c[i] + trimmed[j] * trimmed[j + i];
-    }
-  }
-
-  let d = 0;
-  while (c[d] > c[d + 1]) d++;
-  let maxval = -1;
-  let maxpos = -1;
-  for (let i = d; i < trimmed.length; i++) {
-    if (c[i] > maxval) {
-      maxval = c[i];
-      maxpos = i;
-    }
-  }
-  const T0 = maxpos;
-  if (maxval > 0.01 && T0 > 0) {
-    const pitch = sampleRate / T0;
+  if (bestVal > 0.01 && bestLag > 0) {
+    const pitch = Math.round(sampleRate / bestLag);
     if (pitch >= 65 && pitch <= 420) {
-      return Math.round(pitch);
+      return pitch;
     }
   }
   return -1;
@@ -167,7 +154,7 @@ export class VoiceAnalyzer {
     const isMobile =
       typeof window !== "undefined" &&
       (window.innerWidth < 768 || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0));
-    const targetInterval = isMobile ? 95 : 65; // ~10 FPS mobile, ~15 FPS desktop
+    const targetInterval = isMobile ? 140 : 100; // ~10 FPS desktop, ~7 FPS mobile (more than responsive for visual voice meter)
 
     let lastTickTime = 0;
     let lastPitchTime = 0;
@@ -231,8 +218,8 @@ export class VoiceAnalyzer {
           this.speechEnvelopeHistory.shift();
         }
 
-        // Throttle pitch autocorrelation: only run once every 160ms when speaking
-        if (now - lastPitchTime >= 160) {
+        // Throttle pitch autocorrelation: only run once every 240ms when speaking
+        if (now - lastPitchTime >= 240) {
           lastPitchTime = now;
           const pitch = autoCorrelatePitch(this.timeDomainBuffer, this.audioContext?.sampleRate || 44100);
           if (pitch > 0) {

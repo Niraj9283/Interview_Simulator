@@ -67,10 +67,10 @@ function usePrefersReducedMotion() {
 
 function buildParticles(width: number, height: number, isMobile = false) {
   const random = createRandom(20260521);
-  const maxCap = isMobile ? 40 : 145;
-  const minCap = isMobile ? 22 : 72;
-  const count = Math.round(Math.min(maxCap, Math.max(minCap, (width * height) / (isMobile ? 18000 : 11800))));
-  const clusterCount = isMobile ? 4 : 7;
+  const maxCap = isMobile ? 20 : 48;
+  const minCap = isMobile ? 12 : 28;
+  const count = Math.round(Math.min(maxCap, Math.max(minCap, (width * height) / (isMobile ? 32000 : 26000))));
+  const clusterCount = isMobile ? 3 : 5;
   const clusters = Array.from({ length: clusterCount }, () => ({
     x: random() * width,
     y: random() * height,
@@ -84,7 +84,7 @@ function buildParticles(width: number, height: number, isMobile = false) {
     const x = clustered ? cluster.x + (random() - 0.5) * spreadX : random() * width;
     const y = clustered ? cluster.y + (random() - 0.5) * spreadY : random() * height;
 
-    return {
+  return {
       id: index,
       x,
       y,
@@ -248,102 +248,47 @@ export default function InteractiveBackground() {
 
     function paintMesh() {
       const particles = particlesRef.current;
-      const maxDistance = Math.min(172, Math.max(118, state.width / 8.4));
+      const maxDistance = Math.min(160, Math.max(100, state.width / 9));
       const maxDistanceSquared = maxDistance * maxDistance;
-      const grid = new Map<string, Particle[]>();
-
-      for (const particle of particles) {
-        const cellX = Math.floor(particle.x / maxDistance);
-        const cellY = Math.floor(particle.y / maxDistance);
-        const key = `${cellX}:${cellY}`;
-        const cell = grid.get(key);
-
-        if (cell) {
-          cell.push(particle);
-        } else {
-          grid.set(key, [particle]);
-        }
-      }
 
       ctx.lineWidth = 1;
-      if (!isMobile) {
-        ctx.shadowColor = "rgba(255, 44, 150, 0.35)";
-        ctx.shadowBlur = 5;
-      }
 
       for (let i = 0; i < particles.length; i += 1) {
         const particle = particles[i];
-        let nearest: MeshNeighbor | null = null;
-        let secondNearest: MeshNeighbor | null = null;
-        const cellX = Math.floor(particle.x / maxDistance);
-        const cellY = Math.floor(particle.y / maxDistance);
+        for (let j = i + 1; j < particles.length; j += 1) {
+          const other = particles[j];
+          const dx = particle.x - other.x;
+          const dy = particle.y - other.y;
+          const distSq = dx * dx + dy * dy;
 
-        for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
-          for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-            const cell = grid.get(`${cellX + offsetX}:${cellY + offsetY}`);
-
-            if (!cell) continue;
-
-            for (const other of cell) {
-              if (other.id <= particle.id) continue;
-
-              const dx = particle.x - other.x;
-              const dy = particle.y - other.y;
-              const distanceSquared = dx * dx + dy * dy;
-
-              if (distanceSquared > maxDistanceSquared) continue;
-
-              if (!nearest || distanceSquared < nearest.distanceSquared) {
-                secondNearest = nearest;
-                nearest = { particle: other, distanceSquared };
-              } else if (!secondNearest || distanceSquared < secondNearest.distanceSquared) {
-                secondNearest = { particle: other, distanceSquared };
-              }
-
-              const alpha = (1 - Math.sqrt(distanceSquared) / maxDistance) * 0.68;
-              ctx.strokeStyle = `rgba(255, 36, 143, ${alpha})`;
-              ctx.beginPath();
-              ctx.moveTo(particle.x, particle.y);
-              ctx.lineTo(other.x, other.y);
-              ctx.stroke();
-            }
+          if (distSq < maxDistanceSquared) {
+            const alpha = (1 - Math.sqrt(distSq) / maxDistance) * 0.55;
+            ctx.strokeStyle = `rgba(255, 36, 143, ${alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(particle.x, particle.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
           }
         }
-
-        if (nearest && secondNearest) {
-          const a = nearest.particle;
-          const b = secondNearest.particle;
-
-          ctx.fillStyle = "rgba(255, 36, 143, 0.032)";
-          ctx.beginPath();
-          ctx.moveTo(particle.x, particle.y);
-          ctx.lineTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      if (!isMobile) {
-        ctx.shadowBlur = 10;
       }
 
       for (const particle of particles) {
         const pulse = 0.72 + Math.sin(state.time * 0.035 + particle.phase) * 0.28;
-        ctx.fillStyle = `rgba(255, 43, 147, ${0.68 + pulse * 0.22})`;
+        ctx.fillStyle = `rgba(255, 43, 147, ${0.72 + pulse * 0.24})`;
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius + pulse * 0.55, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, particle.radius + pulse * 0.5, 0, Math.PI * 2);
         ctx.fill();
-      }
-
-      if (!isMobile) {
-        ctx.shadowBlur = 0;
       }
     }
 
     let lastPaint = 0;
     function paint(now: number) {
-      if (isMobile && now - lastPaint < 32) {
+      if (typeof document !== "undefined" && document.hidden) {
+        frameRef.current = window.requestAnimationFrame(paint);
+        return;
+      }
+      // Target steady 30 FPS for background ambiance to keep 100% of GPU/CPU for camera & audio
+      if (now - lastPaint < 33) {
         frameRef.current = window.requestAnimationFrame(paint);
         return;
       }
