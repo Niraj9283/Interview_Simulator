@@ -54,55 +54,380 @@ body > main {
   z-index: 1;
 }
 
-.interview-shell[data-panel-theme="dark"] .bg-white,
-.interview-shell[data-panel-theme="dark"] .bg-white\/92,
-.interview-shell[data-panel-theme="dark"] .bg-zinc-50,
-.interview-shell[data-panel-theme="dark"] .bg-zinc-100,
-.interview-shell[data-panel-theme="dark"] .bg-\[\#fbfcfa\] {
-  background-color: rgba(25, 10, 46, 0.92) !important;
+/* ==========================================================================
+   DARK THEME SYSTEM (MockMate AI)
+   High-contrast, cyberpunk-violet aesthetic with crystal clear labels,
+   elevated glass panels, and cohesive color semantics.
+   ========================================================================== */
+
+/* Main container color inheritance */
+.interview-shell[data-panel-theme="dark"] {
+  color: #fbf7ff !important;
 }
 
+/* 1. Main Panels & Large Structural Containers */
+.interview-shell[data-panel-theme="dark"] aside,
+.interview-shell[data-panel-theme="dark"] section.min-h-\[720px\] {
+  background-color: rgba(20, 9, 36, 0.88) !important;
+  border-color: rgba(168, 85, 247, 0.22) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(168, 85, 247, 0.08) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Modals & Dialog Overlays */
+.interview-shell[data-panel-theme="dark"] .max-h-\[90vh\],
+.interview-shell[data-panel-theme="dark"] .max-h-\[92vh\],
+.interview-shell[data-panel-theme="dark"] .max-h-\[96vh\],
+.interview-shell[data-panel-theme="dark"] .fixed .bg-white {
+  background-color: #140826 !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  color: #fbf7ff !important;
+}
+
+/* 2. Card Backgrounds, Nested Containers & Opacity Variants */
+.interview-shell[data-panel-theme="dark"] .bg-white,
+.interview-shell[data-panel-theme="dark"] [class*="bg-white/"],
+.interview-shell[data-panel-theme="dark"] .bg-zinc-50,
+.interview-shell[data-panel-theme="dark"] [class*="bg-zinc-50/"],
+.interview-shell[data-panel-theme="dark"] .bg-zinc-100,
+.interview-shell[data-panel-theme="dark"] [class*="bg-zinc-100/"],
+.interview-shell[data-panel-theme="dark"] .bg-\[\#fbfcfa\] {
+  background-color: rgba(30, 14, 54, 0.75) !important;
+}
+
+/* Deeper Nested Cards & Items */
+.interview-shell[data-panel-theme="dark"] .bg-zinc-200,
+.interview-shell[data-panel-theme="dark"] [class*="bg-zinc-200/"] {
+  background-color: rgba(48, 22, 84, 0.65) !important;
+}
+
+/* 3. Text & Typography - Guarantee Every Single Label is Sharp & Legible */
+.interview-shell[data-panel-theme="dark"].text-zinc-950,
+.interview-shell[data-panel-theme="dark"] .text-zinc-950,
+.interview-shell[data-panel-theme="dark"] .text-zinc-900,
+.interview-shell[data-panel-theme="dark"] .text-zinc-800 {
+  color: #ffffff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-700 {
+  color: #f3e8ff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-600 {
+  color: #e9d5ff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-500 {
+  color: #d8b4fe !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-400 {
+  color: #c4b5fd !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .text-zinc-300,
+.interview-shell[data-panel-theme="dark"] .text-zinc-200,
+.interview-shell[data-panel-theme="dark"] .text-zinc-100 {
+  color: #f5f3ff !important;
+}
+
+/* 4. Borders & Dividers */
+.interview-shell[data-panel-theme="dark"] .border-zinc-100,
 .interview-shell[data-panel-theme="dark"] .border-zinc-200,
-.interview-shell[data-panel-theme="dark"] .border-zinc-300 {
-  border-color: rgba(217, 70, 239, 0.28) !important;
+.interview-shell[data-panel-theme="dark"] [class*="border-zinc-200/"],
+.interview-shell[data-panel-theme="dark"] .border-zinc-300,
+.interview-shell[data-panel-theme="dark"] .border-zinc-400 {
+  border-color: rgba(168, 85, 247, 0.22) !important;
 }
 
 .interview-shell[data-panel-theme="dark"] .border-dashed {
-  border-color: rgba(244, 114, 182, 0.34) !important;
+  border-color: rgba(192, 132, 252, 0.35) !important;
 }
 
+/* 5. Inputs, Textareas, Selects & Option Elements */
 .interview-shell[data-panel-theme="dark"] input:not([type="file"]),
 .interview-shell[data-panel-theme="dark"] select,
 .interview-shell[data-panel-theme="dark"] textarea {
-  background-color: rgba(17, 6, 34, 0.88) !important;
-  border-color: rgba(217, 70, 239, 0.3) !important;
+  background-color: rgba(15, 6, 28, 0.9) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
   color: #fbf7ff !important;
+}
+
+.interview-shell[data-panel-theme="dark"] input:not([type="file"]):focus,
+.interview-shell[data-panel-theme="dark"] select:focus,
+.interview-shell[data-panel-theme="dark"] textarea:focus {
+  border-color: #c084fc !important;
+  background-color: rgba(22, 9, 42, 0.95) !important;
+  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.3) !important;
+  outline: none !important;
 }
 
 .interview-shell[data-panel-theme="dark"] input::placeholder,
 .interview-shell[data-panel-theme="dark"] textarea::placeholder {
-  color: rgba(250, 232, 255, 0.52) !important;
+  color: rgba(216, 180, 254, 0.5) !important;
 }
 
 .interview-shell[data-panel-theme="dark"] select option {
-  background-color: #190a2e;
-  color: #fbf7ff;
-}
-
-.interview-shell[data-panel-theme="dark"] .text-zinc-950,
-.interview-shell[data-panel-theme="dark"] .text-zinc-900,
-.interview-shell[data-panel-theme="dark"] .text-zinc-800,
-.interview-shell[data-panel-theme="dark"] .text-zinc-700 {
+  background-color: #160728 !important;
   color: #fbf7ff !important;
 }
 
-.interview-shell[data-panel-theme="dark"] .text-zinc-600,
-.interview-shell[data-panel-theme="dark"] .text-zinc-500 {
-  color: rgba(250, 232, 255, 0.72) !important;
+/* 6. Form Upload Dropzone */
+.interview-shell[data-panel-theme="dark"] label.border-dashed {
+  background-color: rgba(26, 11, 48, 0.6) !important;
+}
+.interview-shell[data-panel-theme="dark"] label.border-dashed:hover {
+  background-color: rgba(45, 18, 82, 0.75) !important;
+  border-color: #c084fc !important;
+}
+.interview-shell[data-panel-theme="dark"] label.border-dashed svg {
+  color: #34d399 !important;
 }
 
-.interview-shell[data-panel-theme="dark"] .bg-zinc-200 {
-  background-color: rgba(113, 63, 140, 0.55) !important;
+/* 7. Buttons: Outlines, Inactive states & Hover feedback */
+.interview-shell[data-panel-theme="dark"] button.border-zinc-200,
+.interview-shell[data-panel-theme="dark"] button.border-zinc-300 {
+  background-color: rgba(36, 17, 62, 0.6) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: #e9d5ff !important;
+}
+.interview-shell[data-panel-theme="dark"] button.border-zinc-200:hover,
+.interview-shell[data-panel-theme="dark"] button.border-zinc-300:hover {
+  background-color: rgba(58, 27, 98, 0.8) !important;
+  border-color: rgba(192, 132, 252, 0.5) !important;
+  color: #ffffff !important;
+}
+
+/* Track / Question Type Active Selection Button */
+.interview-shell[data-panel-theme="dark"] button.bg-zinc-950 {
+  background-color: rgba(88, 28, 135, 0.9) !important;
+  border-color: rgba(192, 132, 252, 0.6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.35) !important;
+}
+
+/* Inactive Difficulty & Mode Buttons */
+.interview-shell[data-panel-theme="dark"] .grid-cols-3 button:not(.bg-white):not([class*="bg-indigo"]):not([class*="bg-purple"]) {
+  color: rgba(216, 202, 237, 0.75) !important;
+}
+.interview-shell[data-panel-theme="dark"] .grid-cols-3 button:not(.bg-white):hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Active Difficulty Button in Dark Mode */
+.interview-shell[data-panel-theme="dark"] .grid-cols-3 button.bg-white {
+  background-color: rgba(126, 34, 206, 0.85) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.4) !important;
+}
+
+/* 8. Right-Hand Tab Segmented Controller (Scorecard, Memory, Skills, Integrity) */
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 {
+  background-color: rgba(24, 10, 42, 0.8) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+}
+
+/* Active Tab */
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 button.bg-white {
+  background-color: rgba(109, 40, 217, 0.65) !important;
+  border-color: rgba(192, 132, 252, 0.5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.3) !important;
+}
+
+/* Inactive Tab */
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 button:not(.bg-white) {
+  color: rgba(233, 213, 255, 0.8) !important;
+  background-color: transparent !important;
+}
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 button:not(.bg-white):hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* Tab Badges */
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 button.bg-white span.rounded-full {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+.interview-shell[data-panel-theme="dark"] aside .grid.grid-cols-2 button:not(.bg-white) span.rounded-full {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(233, 213, 255, 0.8) !important;
+}
+
+/* 9. Scorecard Average Gauge */
+.interview-shell[data-panel-theme="dark"] .border-emerald-600.bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.25) !important;
+}
+.interview-shell[data-panel-theme="dark"] .border-emerald-600.bg-emerald-50 .text-zinc-950 {
+  color: #ffffff !important;
+}
+.interview-shell[data-panel-theme="dark"] .border-emerald-600.bg-emerald-50 .text-zinc-500 {
+  color: #6ee7b7 !important;
+}
+
+/* 10. Metric Progress Bars */
+.interview-shell[data-panel-theme="dark"] .h-2.bg-zinc-100,
+.interview-shell[data-panel-theme="dark"] .h-1\.5.bg-zinc-200,
+.interview-shell[data-panel-theme="dark"] .h-2.bg-zinc-200,
+.interview-shell[data-panel-theme="dark"] .h-2\.5.bg-zinc-200 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 11. Camera Controls Over Video */
+.interview-shell[data-panel-theme="dark"] .bg-white\/92,
+.interview-shell[data-panel-theme="dark"] .bg-white\/70 {
+  background-color: rgba(18, 7, 34, 0.88) !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+  color: #ffffff !important;
+}
+.interview-shell[data-panel-theme="dark"] .bg-white\/92:hover,
+.interview-shell[data-panel-theme="dark"] .bg-white\/70:hover {
+  background-color: rgba(36, 14, 68, 0.95) !important;
+  border-color: rgba(192, 132, 252, 0.5) !important;
+}
+
+/* 12. Colored Badges, Chips, Pills & Alert Containers */
+
+/* Emerald (Success / High Depth / Verified) */
+.interview-shell[data-panel-theme="dark"] [class*="bg-emerald-50"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-emerald-100"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-emerald-200"] {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+.interview-shell[data-panel-theme="dark"] .text-emerald-600,
+.interview-shell[data-panel-theme="dark"] .text-emerald-700,
+.interview-shell[data-panel-theme="dark"] .text-emerald-800,
+.interview-shell[data-panel-theme="dark"] .text-emerald-900,
+.interview-shell[data-panel-theme="dark"] .text-emerald-950 {
+  color: #6ee7b7 !important;
+}
+.interview-shell[data-panel-theme="dark"] [class*="border-emerald-"] {
+  border-color: rgba(52, 211, 153, 0.35) !important;
+}
+
+/* Amber (Warning / Gap / Levels) */
+.interview-shell[data-panel-theme="dark"] [class*="bg-amber-50"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-amber-100"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-amber-200"] {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+.interview-shell[data-panel-theme="dark"] .text-amber-600,
+.interview-shell[data-panel-theme="dark"] .text-amber-700,
+.interview-shell[data-panel-theme="dark"] .text-amber-800,
+.interview-shell[data-panel-theme="dark"] .text-amber-900,
+.interview-shell[data-panel-theme="dark"] .text-amber-950 {
+  color: #fcd34d !important;
+}
+.interview-shell[data-panel-theme="dark"] [class*="border-amber-"] {
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+
+/* Rose / Red (Errors / Low Scores / Priority) */
+.interview-shell[data-panel-theme="dark"] [class*="bg-rose-50"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-rose-100"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-rose-200"] {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+  border-color: rgba(251, 113, 133, 0.35) !important;
+}
+.interview-shell[data-panel-theme="dark"] .text-rose-600,
+.interview-shell[data-panel-theme="dark"] .text-rose-700,
+.interview-shell[data-panel-theme="dark"] .text-rose-800,
+.interview-shell[data-panel-theme="dark"] .text-rose-900,
+.interview-shell[data-panel-theme="dark"] .text-rose-950 {
+  color: #fda4af !important;
+}
+.interview-shell[data-panel-theme="dark"] [class*="border-rose-"] {
+  border-color: rgba(251, 113, 133, 0.35) !important;
+}
+
+/* Purple / Fuchsia (AI / Personality / Features) */
+.interview-shell[data-panel-theme="dark"] [class*="bg-purple-50"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-purple-100"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-purple-200"],
+.interview-shell[data-panel-theme="dark"] .bg-fuchsia-100 {
+  background-color: rgba(168, 85, 247, 0.16) !important;
+  border-color: rgba(192, 132, 252, 0.35) !important;
+}
+.interview-shell[data-panel-theme="dark"] .text-purple-600,
+.interview-shell[data-panel-theme="dark"] .text-purple-700,
+.interview-shell[data-panel-theme="dark"] .text-purple-800,
+.interview-shell[data-panel-theme="dark"] .text-purple-900,
+.interview-shell[data-panel-theme="dark"] .text-purple-950,
+.interview-shell[data-panel-theme="dark"] .text-fuchsia-900 {
+  color: #d8b4fe !important;
+}
+.interview-shell[data-panel-theme="dark"] [class*="border-purple-"] {
+  border-color: rgba(192, 132, 252, 0.35) !important;
+}
+
+/* Indigo / Blue (Structure / Tiers / Frameworks) */
+.interview-shell[data-panel-theme="dark"] [class*="bg-indigo-50"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-indigo-100"],
+.interview-shell[data-panel-theme="dark"] [class*="bg-indigo-200"],
+.interview-shell[data-panel-theme="dark"] .bg-blue-100 {
+  background-color: rgba(99, 102, 241, 0.16) !important;
+  border-color: rgba(129, 140, 248, 0.35) !important;
+}
+.interview-shell[data-panel-theme="dark"] .text-indigo-600,
+.interview-shell[data-panel-theme="dark"] .text-indigo-700,
+.interview-shell[data-panel-theme="dark"] .text-indigo-800,
+.interview-shell[data-panel-theme="dark"] .text-indigo-900,
+.interview-shell[data-panel-theme="dark"] .text-indigo-950,
+.interview-shell[data-panel-theme="dark"] .text-blue-700,
+.interview-shell[data-panel-theme="dark"] .text-blue-800,
+.interview-shell[data-panel-theme="dark"] .text-blue-900 {
+  color: #a5b4fc !important;
+}
+.interview-shell[data-panel-theme="dark"] [class*="border-indigo-"],
+.interview-shell[data-panel-theme="dark"] [class*="border-blue-"] {
+  border-color: rgba(129, 140, 248, 0.35) !important;
+}
+
+/* 13. Complex Gradients in Cards (Delta Card, Benchmarks, Coach Tips) */
+.interview-shell[data-panel-theme="dark"] .from-purple-50,
+.interview-shell[data-panel-theme="dark"] .via-indigo-50,
+.interview-shell[data-panel-theme="dark"] .to-purple-50 {
+  background-image: linear-gradient(135deg, rgba(88, 28, 135, 0.3) 0%, rgba(49, 46, 129, 0.3) 50%, rgba(88, 28, 135, 0.3) 100%) !important;
+}
+
+.interview-shell[data-panel-theme="dark"] .from-amber-50\/90,
+.interview-shell[data-panel-theme="dark"] .via-orange-50\/70,
+.interview-shell[data-panel-theme="dark"] .to-amber-50\/90 {
+  background-image: linear-gradient(135deg, rgba(120, 53, 15, 0.3) 0%, rgba(124, 45, 18, 0.3) 50%, rgba(120, 53, 15, 0.3) 100%) !important;
+}
+
+/* 14. Session Log Article Items in Scorecard Tab */
+.interview-shell[data-panel-theme="dark"] article.bg-white {
+  background-color: rgba(30, 14, 54, 0.75) !important;
+  border-color: rgba(168, 85, 247, 0.22) !important;
+}
+.interview-shell[data-panel-theme="dark"] article.bg-white:hover {
+  background-color: rgba(48, 22, 84, 0.85) !important;
+  border-color: rgba(192, 132, 252, 0.45) !important;
+}
+
+/* 15. Smooth Custom Scrollbar for Dark Panels & Modals */
+.interview-shell[data-panel-theme="dark"] *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.interview-shell[data-panel-theme="dark"] *::-webkit-scrollbar-track {
+  background: rgba(16, 7, 30, 0.4);
+}
+.interview-shell[data-panel-theme="dark"] *::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.3);
+  border-radius: 9999px;
+}
+.interview-shell[data-panel-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(192, 132, 252, 0.55);
 }
 
 .interview-shell[data-panel-theme="dark"] .shadow-sm {
