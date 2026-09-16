@@ -148,6 +148,25 @@ class RAGEngine:
         if self.technical_collection.count() == 0:
             self._seed_technical_knowledge()
 
+    def get_status(self) -> dict[str, Any]:
+        return {
+            "status": "ready",
+            "collections": {
+                "candidate_knowledge": {
+                    "count": self.candidate_collection.count(),
+                    "description": "Candidate resume chunks, projects, skills, and experience",
+                },
+                "interview_knowledge": {
+                    "count": self.interview_collection.count(),
+                    "description": "Interview question bank across behavioral, system design, DSA, and HR",
+                },
+                "technical_knowledge": {
+                    "count": self.technical_collection.count(),
+                    "description": "Deep technical knowledge rubrics for Python, ML, DL, RAG, LLMs, SQL",
+                },
+            },
+        }
+
     def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """Extract text from uploaded PDF resume."""
         if not HAS_PYPDF or pypdf is None:

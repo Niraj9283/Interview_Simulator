@@ -37,6 +37,20 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def strip_api_backend_prefix(request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/backend"):
+        stripped = path[len("/api/backend"):]
+        request.scope["path"] = stripped if stripped else "/"
+    return await call_next(request)
+
+
+@app.get("/")
+async def root() -> dict[str, str]:
+    return {"status": "ok", "app": "MockMate AI API"}
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
