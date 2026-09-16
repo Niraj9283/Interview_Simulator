@@ -46,7 +46,8 @@ venv/
 env/
 *.egg-info/
 .pytest_cache/
-backend/data/
+backend/data/*
+!backend/data/interview-role-database.json
 *.sqlite3
 
 

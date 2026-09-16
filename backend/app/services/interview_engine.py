@@ -37,10 +37,25 @@ STOP_WORDS = {
     "your",
 }
 
-ROLE_DATABASE_PATH = Path(__file__).resolve().parents[3] / "data" / "interview-role-database.json"
+def _resolve_role_database_path() -> Path:
+    candidates = [
+        Path(__file__).resolve().parents[2] / "data" / "interview-role-database.json",
+        Path(__file__).resolve().parents[3] / "data" / "interview-role-database.json",
+        Path.cwd() / "data" / "interview-role-database.json",
+        Path.cwd() / "backend" / "data" / "interview-role-database.json",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
+ROLE_DATABASE_PATH = _resolve_role_database_path()
 
 
 def load_role_database() -> dict:
+    if not ROLE_DATABASE_PATH.is_file():
+        return {}
     with ROLE_DATABASE_PATH.open(encoding="utf-8") as database_file:
         return json.load(database_file)
 
