@@ -18,6 +18,9 @@ import chromadb
 from chromadb.config import Settings
 import pypdf
 
+from app.config import settings
+from app.sanitization import sanitize_text
+
 
 CHROMA_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "chroma_db"
 CHROMA_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -25,10 +28,13 @@ CHROMA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 class RAGEngine:
     def __init__(self) -> None:
-        # Initialize persistent Chroma client
+        # Initialize persistent Chroma client with safe reset policy
         self.client = chromadb.PersistentClient(
             path=str(CHROMA_DATA_DIR),
-            settings=Settings(anonymized_telemetry=False, allow_reset=True),
+            settings=Settings(
+                anonymized_telemetry=False,
+                allow_reset=settings.CHROMA_ALLOW_RESET,
+            ),
         )
 
         # 3 Dedicated Collections as specified
@@ -55,22 +61,31 @@ class RAGEngine:
             self._seed_technical_knowledge()
 
     def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
-        """Extract text from uploaded PDF resume."""
+        """Extract text from uploaded PDF resume with size and decompression bounds."""
+        if len(pdf_bytes) > settings.MAX_UPLOAD_SIZE_BYTES:
+            raise ValueError(f"PDF file size ({len(pdf_bytes)} bytes) exceeds maximum limit ({settings.MAX_UPLOAD_SIZE_BYTES} bytes).")
+
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
         extracted_pages = []
-        for i, page in enumerate(reader.pages):
+        # Limit to max 25 pages to prevent unbounded PDF decompression attacks
+        for i, page in enumerate(reader.pages[:25]):
             text = page.extract_text()
             if text:
-                extracted_pages.append(text)
+                extracted_pages.append(sanitize_text(text, max_length=20000))
         return "\n\n".join(extracted_pages)
+
 
     def parse_and_chunk_resume(self, resume_text: str, candidate_name: str = "Candidate") -> list[dict[str, Any]]:
         """
         Parses resume text into structured domain chunks:
         Projects, Skills, Experience, Education, and Summary.
         """
+        resume_text = sanitize_text(resume_text, max_length=settings.MAX_TEXT_INPUT_LENGTH)
+        candidate_name = sanitize_text(candidate_name, max_length=120) or "Candidate"
+
         chunks: list[dict[str, Any]] = []
         lines = resume_text.splitlines()
+
 
         current_category = "summary"
         current_buffer: list[str] = []

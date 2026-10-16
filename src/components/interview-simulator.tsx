@@ -137,6 +137,13 @@ import {
   normalizeTechnicalTranscript,
   packageVoiceAnswer,
 } from "@/lib/voice-answer-engine";
+import {
+  CopyButton,
+  ExpandableFAQ,
+  ConfirmationModal,
+  LastUpdatedBadge,
+} from "@/components/features";
+
 
 type Stage = "setup" | "live" | "complete";
 type PanelTheme = "light" | "dark";
@@ -198,6 +205,7 @@ export default function InterviewSimulator() {
   const [panelTheme, setPanelTheme] = useState<PanelTheme>("light");
   const [resumeFileName, setResumeFileName] = useState("sample-profile.txt");
   const [stage, setStage] = useState<Stage>("setup");
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -264,6 +272,8 @@ export default function InterviewSimulator() {
   const [sessionSkillDeltas, setSessionSkillDeltas] = useState<{ skillName: string; oldScore: number; newScore: number; delta: number }[]>([]);
   const [activeBenchmark, setActiveBenchmark] = useState<SessionBenchmarkResult | null>(null);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<number>(() => Date.now());
   const [voiceAnswerState, setVoiceAnswerState] = useState<VoiceAnswerState>("idle");
   const [voiceRecordingSeconds, setVoiceRecordingSeconds] = useState<number>(0);
   const [voiceTranscriptBundle, setVoiceTranscriptBundle] = useState<VoiceTranscriptBundle | null>(null);
@@ -364,7 +374,7 @@ export default function InterviewSimulator() {
     () => extractKeywords(profile.resumeText, `${profile.targetRole} ${profile.department}`),
     [profile.department, profile.resumeText, profile.targetRole],
   );
-  const currentQuestion = questions[questionIndex] ?? "Start a session to generate the first adaptive question.";
+  const currentQuestion = questions[questionIndex] ?? "";
   const average = averageScore(history);
   const latestTurn = history.at(-1);
   const completedQuestions = history.length;
@@ -460,9 +470,20 @@ export default function InterviewSimulator() {
 
     const interval = window.setInterval(() => {
       if (integrityTrackerRef.current) {
-        setIntegrityState(integrityTrackerRef.current.getState());
+        const next = integrityTrackerRef.current.getState();
+        setIntegrityState((prev) => {
+          if (
+            prev.integrityScore === next.integrityScore &&
+            prev.tabSwitchCount === next.tabSwitchCount &&
+            prev.clipboardEventsCount === next.clipboardEventsCount &&
+            prev.recentEvents.length === next.recentEvents.length
+          ) {
+            return prev;
+          }
+          return next;
+        });
       }
-    }, 1200);
+    }, 2000);
 
     return () => {
       window.clearInterval(interval);
@@ -819,6 +840,7 @@ export default function InterviewSimulator() {
     setStage("live");
     setQuestionStartedAt(performance.now());
     setBackendLatency(0);
+    setLastUpdatedTime(Date.now());
   }
 
   function submitAnswer(mode: "question" | "ab_attempt" = "question") {
@@ -968,6 +990,7 @@ export default function InterviewSimulator() {
     voiceAnalyzerRef.current?.resetTurnStats();
     speechTrackerRef.current?.reset();
     setBackendLatency(0);
+    setLastUpdatedTime(Date.now());
 
     if (nextHistory.length >= 6) {
       const { updatedProfile, skillDeltas } = updateDigitalProfileFromSession(digitalProfile, nextHistory, profile);
@@ -1150,6 +1173,7 @@ export default function InterviewSimulator() {
 
   function resetSession() {
     setStage("setup");
+    setIsWorkspaceOpen(false);
     setQuestions([]);
     setQuestionIndex(0);
     setAnswer("");
@@ -1169,7 +1193,17 @@ export default function InterviewSimulator() {
     voiceAnalyzerRef.current?.resetTurnStats();
     speechTrackerRef.current?.reset();
     setBackendLatency(0);
+    setLastUpdatedTime(Date.now());
   }
+
+  function handlePromptReset() {
+    if (stage === "live" || history.length > 0) {
+      setShowResetConfirmModal(true);
+    } else {
+      resetSession();
+    }
+  }
+
 
   const CurrentDomainIcon = domainIcons[profile.domain];
   const CurrentDepartmentIcon = departmentIcons[profile.department];
@@ -1178,144 +1212,141 @@ export default function InterviewSimulator() {
     <main className="interview-shell relative min-h-screen bg-transparent text-zinc-950" data-panel-theme={panelTheme}>
 
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-4 px-4 py-4 lg:px-6">
-        <header className="flex flex-col gap-3 border-b border-fuchsia-400/20 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <header className="sticky top-2 z-30 flex flex-col gap-3 rounded-2xl border border-[#222222] bg-[#111111]/90 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between transition-all print:hidden">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-md bg-zinc-950 text-white">
-              <BrainCircuit size={24} strokeWidth={1.8} />
+            <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-[#D9362B] to-[#FF4D3D] text-white shadow-md shadow-[#FF4D3D]/25">
+              <BrainCircuit size={22} strokeWidth={1.8} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-normal text-white">MockMate AI</h1>
-              <p className="text-sm text-fuchsia-100/80">Real-time interview simulator</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold tracking-tight text-[#F5F5F5]">MockMate<span className="text-[#FF4D3D]">.AI</span></h1>
+                <span className="rounded-full bg-[#FF4D3D]/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-[#FF4D3D] border border-[#FF4D3D]/30">
+                  v2.0
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[#A0A0A0]">
+                <span>Autonomous interview & evaluation architecture</span>
+                <LastUpdatedBadge timestamp={lastUpdatedTime} />
+              </div>
             </div>
           </div>
+
           <div className="flex flex-col gap-2 lg:items-end">
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <EdgeModeToggle mode={executionMode} onModeChange={setExecutionMode} />
-              <button
-                type="button"
-                onClick={() => setShowEdgeModal(true)}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60"
-                title="Inspect Edge AI Architecture & Topology"
-              >
-                <Cpu size={16} className="text-amber-400" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Edge AI
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1 text-[9px] font-mono">Topology</span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">Air-Gapped Laptop</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowIntegrityModal(true)}
-                className={`flex h-12 items-center gap-2 rounded-md border px-3 text-left shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition cursor-pointer ${
-                  integrityState.integrityScore < 75
-                    ? "border-amber-400/50 bg-[#351a24]/90 text-amber-200"
-                    : "border-fuchsia-400/25 bg-[#241044]/86 text-white hover:border-fuchsia-300/60"
-                }`}
-                title="Inspect Anti-Cheating & Interview Integrity Telemetry"
-              >
-                <ShieldCheck size={16} className={integrityState.integrityScore < 75 ? "text-amber-400" : "text-emerald-400"} />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight flex items-center gap-1 text-white">
-                    Integrity
-                    <span className={`rounded px-1 text-[9px] font-mono font-bold ${integrityState.integrityScore >= 85 ? "bg-emerald-400/20 text-emerald-300" : "bg-amber-400/20 text-amber-300"}`}>
-                      {integrityState.integrityScore}%
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">{integrityState.integrityLevel}</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(true)}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60 cursor-pointer"
-                title="View Persistent Candidate Digital Profile & Mastery Vectors"
-              >
-                <Fingerprint size={16} className="text-purple-400" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Digital Profile
-                    <span className="rounded bg-purple-400/20 text-purple-300 px-1 text-[9px] font-mono">
-                      {digitalProfile.overallReadiness}%
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">{digitalProfile.sessionsCompleted} Sessions Tracked</span>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!activeBenchmark) {
-                    setActiveBenchmark(computeSessionBenchmark(history, profile, digitalProfile));
-                  }
-                  setShowBenchmarkModal(true);
-                }}
-                className="flex h-12 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60 cursor-pointer"
-                title="View Longitudinal Benchmark & Cohort Progress (Interview #1 through #4)"
-              >
-                <Trophy size={16} className="text-amber-400" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
-                    Benchmark
-                    <span className="rounded bg-amber-400/20 text-amber-300 px-1 text-[9px] font-mono">
-                      Top 14%
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-fuchsia-200/80">4 Attempts · +18pts</span>
-                </div>
-              </button>
-              <ThemeToggle theme={panelTheme} onThemeChange={setPanelTheme} />
-              <TimeWeatherPanel />
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <StatusPill icon={CurrentDepartmentIcon} label={getDepartmentLabel(profile.department)} />
-              <StatusPill icon={CurrentDomainIcon} label={profile.domain} />
-              <StatusPill icon={Gauge} label={`Diff: ${dynamicDifficulty}`} />
-              <StatusPill
-                icon={executionMode === "edge" ? ShieldCheck : Wifi}
-                label={executionMode === "edge" ? "Edge: Air-Gapped" : "Cloud: Online"}
-              />
-              <StatusPill icon={TrendingUp} label={stage === "complete" ? "Complete" : `${progress}%`} />
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {isWorkspaceOpen && (
+                <button
+                  type="button"
+                  onClick={handlePromptReset}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#262626] bg-[#151515] px-2.5 py-1 text-xs font-semibold text-[#A0A0A0] hover:text-[#FF4D3D] hover:border-[#FF4D3D]/40 transition cursor-pointer"
+                  title="Return to Home / Setup"
+                >
+                  <RotateCcw size={13} />
+                  <span>End Session / Home</span>
+                </button>
+              )}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <StatusPill icon={CurrentDepartmentIcon} label={getDepartmentLabel(profile.department)} />
+                <StatusPill icon={CurrentDomainIcon} label={profile.domain} />
+                <StatusPill icon={Gauge} label={`Diff: ${dynamicDifficulty}`} />
+                <StatusPill
+                  icon={executionMode === "edge" ? ShieldCheck : Wifi}
+                  label={executionMode === "edge" ? "Edge: Air-Gapped" : "Cloud: Online"}
+                />
+                <StatusPill icon={TrendingUp} label={stage === "complete" ? "Complete" : `${progress}%`} />
+              </div>
             </div>
           </div>
         </header>
+
+        {/* Cinematic Hero Section (Setup Stage) */}
+        {!isWorkspaceOpen && (
+          <section className="relative flex flex-1 flex-col justify-center overflow-hidden rounded-2xl border border-[#222222] bg-gradient-to-b from-[#141414] via-[#0e0e0e] to-[#080808] p-8 lg:p-14 shadow-2xl min-h-[65vh] animate-in fade-in duration-300">
+            {/* Ambient Red Glow */}
+            <div className="pointer-events-none absolute -right-16 -top-16 h-96 w-96 rounded-full bg-[#FF4D3D]/12 blur-[100px]" />
+            <div className="pointer-events-none absolute -left-16 -bottom-16 h-96 w-96 rounded-full bg-[#D9362B]/10 blur-[100px]" />
+
+            {/* Subtle fine geometric line pattern */}
+            <div className="pointer-events-none absolute inset-0 opacity-[0.035] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:36px_36px]" />
+
+            <div className="relative z-10 max-w-4xl space-y-6">
+              {/* Category Pill */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#FF4D3D]/30 bg-[#FF4D3D]/10 px-3.5 py-1 text-xs font-mono font-semibold text-[#FF4D3D]">
+                <span className="size-2 rounded-full bg-[#FF4D3D] animate-ping" />
+                <span>AUTONOMOUS TALENT INTELLIGENCE // LIVE SIMULATION</span>
+              </div>
+
+              {/* Bold Large Headline with highlighted red-orange words */}
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#F5F5F5] leading-[1.12]">
+                Master Technical Interviews with{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4D3D] via-[#ff7062] to-[#D9362B]">
+                  Real-Time Multimodal AI
+                </span>
+              </h2>
+
+              {/* Short concise supporting paragraph */}
+              <p className="max-w-2xl text-base sm:text-lg text-[#A0A0A0] leading-relaxed">
+                Simulate high-stakes engineering, architecture, and leadership interviews. Featuring real-time MediaPipe gaze tracking, Web Audio cadence forensics, on-device Edge RAG, and automated STAR rubric synthesis.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceOpen(true)}
+                  className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-8 py-4 text-base font-bold text-white shadow-xl shadow-[#FF4D3D]/30 transition hover:brightness-110 active:scale-95 cursor-pointer"
+                >
+                  <Play size={18} fill="currentColor" />
+                  <span>Launch Live Simulator</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEdgeModal(true)}
+                  className="flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#151515] px-6 py-4 text-sm font-semibold text-[#F5F5F5] transition hover:border-[#FF4D3D]/50 hover:bg-[#1c1c1c] active:scale-95 cursor-pointer"
+                >
+                  <Cpu size={16} className="text-[#FF4D3D]" />
+                  <span>Explore Edge Architecture</span>
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {showEdgeModal && (
           <EdgeArchitectureModal telemetry={edgeTelemetry} onClose={() => setShowEdgeModal(false)} />
         )}
 
-        <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-          <aside className="flex flex-col gap-4 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+        {isWorkspaceOpen && (
+          <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px] animate-in fade-in duration-300">
+          <aside className="flex flex-col gap-4 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5]">
             <section>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Candidate</h2>
+                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Candidate</h2>
                 <button
                   type="button"
-                  onClick={resetSession}
-                  className="grid size-9 place-items-center rounded-md border border-zinc-200 text-zinc-700 transition hover:bg-zinc-100"
+                  onClick={handlePromptReset}
+                  className="grid size-8 place-items-center rounded-lg border border-[#262626] bg-[#151515] text-[#A0A0A0] transition hover:border-[#FF4D3D]/50 hover:text-white cursor-pointer"
                   aria-label="Reset session"
                   title="Reset session"
                 >
-                  <RotateCcw size={17} />
+                  <RotateCcw size={15} />
                 </button>
               </div>
               <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+                <label className="flex flex-col gap-1 text-xs font-medium text-[#A0A0A0]">
                   Name
                   <input
                     value={profile.name}
                     onChange={(event) => updateProfile("name", event.target.value)}
-                    className="h-10 rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white"
+                    className="h-9 rounded-xl border border-[#262626] bg-[#161616] px-3 text-xs text-[#F5F5F5] outline-none transition focus:border-[#FF4D3D]"
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+                <label className="flex flex-col gap-1 text-xs font-medium text-[#A0A0A0]">
                   Department
                   <select
                     value={profile.department}
                     onChange={(event) => handleDepartmentChange(event.target.value as DepartmentId)}
-                    className="h-10 rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white"
+                    className="h-9 rounded-xl border border-[#262626] bg-[#161616] px-3 text-xs text-[#F5F5F5] outline-none transition focus:border-[#FF4D3D]"
                   >
                     {departments.map((department) => (
                       <option key={department} value={department}>
@@ -1324,12 +1355,12 @@ export default function InterviewSimulator() {
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+                <label className="flex flex-col gap-1 text-xs font-medium text-[#A0A0A0]">
                   Target role
                   <select
                     value={profile.targetRole}
                     onChange={(event) => handleRoleChange(event.target.value)}
-                    className="h-10 rounded-md border border-zinc-200 bg-zinc-50 px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white"
+                    className="h-9 rounded-xl border border-[#262626] bg-[#161616] px-3 text-xs text-[#F5F5F5] outline-none transition focus:border-[#FF4D3D]"
                   >
                     {availableRoles.map((role) => (
                       <option key={role.title} value={role.title}>
@@ -1342,10 +1373,10 @@ export default function InterviewSimulator() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Resume</h2>
-              <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 text-center transition hover:border-emerald-500 hover:bg-emerald-50">
-                <Upload size={24} className="text-emerald-700" />
-                <span className="max-w-full truncate text-sm font-medium text-zinc-800">
+              <h2 className="mb-3 text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Resume Grounding</h2>
+              <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#2A2A2A] bg-[#151515] px-3 text-center transition hover:border-[#FF4D3D]/50 hover:bg-[#1a1a1a]">
+                <Upload size={20} className="text-[#FF4D3D]" />
+                <span className="max-w-full truncate text-xs font-medium text-[#F5F5F5]">
                   {isUploadingResume ? "Extracting PDF & Indexing Chroma..." : resumeFileName}
                 </span>
                 <input
@@ -1358,41 +1389,41 @@ export default function InterviewSimulator() {
                 />
               </label>
 
-              <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 p-2.5 text-xs text-zinc-700">
-                <div className="flex items-center justify-between font-semibold text-zinc-800">
-                  <span className="flex items-center gap-1.5 text-emerald-700">
+              <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-[#222222] bg-[#141414] p-2.5 text-xs text-[#A0A0A0]">
+                <div className="flex items-center justify-between font-semibold">
+                  <span className="flex items-center gap-1.5 text-[#FF4D3D]">
                     <Database size={13} />
                     Chroma RAG Collections
                   </span>
-                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                  <span className="rounded bg-[#FF4D3D]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#FF4D3D] border border-[#FF4D3D]/25">
                     {ragStatus?.status === "ready" || ragStatus?.status === "client_active" ? "Active" : "Ready"}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-1 pt-1 text-[11px]">
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Candidate</div>
-                    <div className="text-zinc-500 font-mono">
+                  <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                    <div className="font-semibold text-[#F5F5F5] truncate text-[10px]">Candidate</div>
+                    <div className="text-[#A0A0A0] font-mono text-[10px]">
                       {ragStatus?.collections.candidate_knowledge.count ?? 4} chunks
                     </div>
                   </div>
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Interview</div>
-                    <div className="text-zinc-500 font-mono">
-                      {ragStatus?.collections.interview_knowledge.count ?? 9} questions
+                  <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                    <div className="font-semibold text-[#F5F5F5] truncate text-[10px]">Interview</div>
+                    <div className="text-[#A0A0A0] font-mono text-[10px]">
+                      {ragStatus?.collections.interview_knowledge.count ?? 9} q&apos;s
                     </div>
                   </div>
-                  <div className="rounded bg-white p-1.5 border border-zinc-100">
-                    <div className="font-semibold text-zinc-900 truncate">Technical</div>
-                    <div className="text-zinc-500 font-mono">
+                  <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                    <div className="font-semibold text-[#F5F5F5] truncate text-[10px]">Technical</div>
+                    <div className="text-[#A0A0A0] font-mono text-[10px]">
                       {ragStatus?.collections.technical_knowledge.count ?? 8} rubrics
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 {keywords.slice(0, 6).map((keyword) => (
-                  <span key={keyword} className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                  <span key={keyword} className="rounded-md bg-[#FF4D3D]/10 px-2 py-0.5 text-[11px] font-mono font-medium text-[#FF4D3D] border border-[#FF4D3D]/20">
                     {keyword}
                   </span>
                 ))}
@@ -1401,15 +1432,15 @@ export default function InterviewSimulator() {
 
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Interview Type</h2>
+                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Interview Type</h2>
                 {profile.interviewType === "Coding" && (
-                  <span className="rounded bg-fuchsia-100 text-fuchsia-900 px-2 py-0.5 text-[10px] font-bold font-mono">
-                    💻 Live IDE Arena
+                  <span className="rounded bg-[#FF4D3D]/15 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/30">
+                    💻 IDE Arena
                   </span>
                 )}
                 {profile.interviewType === "System Design" && (
-                  <span className="rounded bg-purple-100 text-purple-900 px-2 py-0.5 text-[10px] font-bold font-mono">
-                    🏗️ Whiteboard Arena
+                  <span className="rounded bg-[#FF4D3D]/15 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/30">
+                    🏗️ Whiteboard
                   </span>
                 )}
               </div>
@@ -1425,23 +1456,23 @@ export default function InterviewSimulator() {
                       disabled={!isAvailable}
                       onClick={() => handleInterviewTypeChange(type)}
                       title={!isAvailable ? "Coding mode is available strictly for Technical department roles" : undefined}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-md border p-2.5 text-xs font-semibold transition cursor-pointer ${
+                      className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-xs font-semibold transition cursor-pointer ${
                         isSelected
-                          ? "border-purple-600 bg-purple-900 text-white shadow-sm ring-2 ring-purple-500/20"
+                          ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-sm ring-1 ring-[#FF4D3D]/40"
                           : !isAvailable
-                          ? "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed opacity-50"
-                          : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                          ? "border-[#222222] bg-[#111111] text-[#555555] cursor-not-allowed opacity-50"
+                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
                       }`}
                     >
                       <span className="flex items-center gap-1.5">
-                        <span className={`size-2 rounded-full ${isSelected ? "bg-emerald-400" : "bg-zinc-300"}`} />
+                        <span className={`size-2 rounded-full ${isSelected ? "bg-[#FF4D3D]" : "bg-[#444444]"}`} />
                         <span>{type}</span>
                       </span>
                       {type === "Coding" && (
-                        <span className="text-[9px] font-mono text-fuchsia-300">Split IDE</span>
+                        <span className="text-[9px] font-mono text-[#FF4D3D]">Split IDE</span>
                       )}
                       {type === "System Design" && (
-                        <span className="text-[9px] font-mono text-purple-300">Whiteboard</span>
+                        <span className="text-[9px] font-mono text-[#FF4D3D]">Topology</span>
                       )}
                     </button>
                   );
@@ -1450,7 +1481,7 @@ export default function InterviewSimulator() {
             </section>
 
             <section>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Question Type</h2>
+              <h2 className="mb-2 text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Question Track & Level</h2>
               <div className="grid grid-cols-2 gap-2">
                 {availableTracks.map((domain) => {
                   const Icon = domainIcons[domain];
@@ -1461,26 +1492,26 @@ export default function InterviewSimulator() {
                       key={domain}
                       type="button"
                       onClick={() => handleTrackChange(domain)}
-                      className={`flex h-20 flex-col items-center justify-center gap-2 rounded-md border px-2 text-xs font-semibold transition ${
+                      className={`flex h-16 flex-col items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition cursor-pointer ${
                         active
-                          ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                          ? "border-[#FF4D3D] bg-[#1f1212] text-white ring-1 ring-[#FF4D3D]/40"
+                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
                       }`}
                     >
-                      <Icon size={18} />
-                      <span className="text-center leading-tight">{domain}</span>
+                      <Icon size={16} className={active ? "text-[#FF4D3D]" : "text-[#A0A0A0]"} />
+                      <span className="text-center leading-tight text-[11px]">{domain}</span>
                     </button>
                   );
                 })}
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 rounded-md bg-zinc-100 p-1">
+              <div className="mt-2.5 grid grid-cols-3 gap-1 rounded-xl bg-[#0c0c0c] border border-[#222222] p-1">
                 {difficulties.map((difficulty) => (
                   <button
                     key={difficulty}
                     type="button"
                     onClick={() => handleDifficultyChange(difficulty)}
-                    className={`h-9 rounded-md text-xs font-semibold transition ${
-                      profile.difficulty === difficulty ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-600"
+                    className={`h-8 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      profile.difficulty === difficulty ? "bg-[#FF4D3D] text-white shadow-sm" : "text-[#A0A0A0] hover:text-white"
                     }`}
                   >
                     {difficulty}
@@ -1492,9 +1523,9 @@ export default function InterviewSimulator() {
             {/* Interview Input Mode (Text | Hybrid | Voice) */}
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Interview Mode</h2>
-                <span className="rounded bg-indigo-100 text-indigo-900 px-2 py-0.5 text-[10px] font-bold font-mono">
-                  {profile.inputMode === "voice_only" ? "🎤 Voice First" : profile.inputMode === "text_only" ? "⌨️ Text Only" : "⚡ Hybrid (Voice + Text)"}
+                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Interview Mode</h2>
+                <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
+                  {profile.inputMode === "voice_only" ? "🎤 Voice First" : profile.inputMode === "text_only" ? "⌨️ Text Only" : "⚡ Hybrid"}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -1509,14 +1540,14 @@ export default function InterviewSimulator() {
                       key={modeItem.id}
                       type="button"
                       onClick={() => updateProfile("inputMode", modeItem.id as InterviewInputMode)}
-                      className={`flex flex-col items-center justify-center rounded-lg border p-2 text-center transition cursor-pointer ${
+                      className={`flex flex-col items-center justify-center rounded-xl border p-2 text-center transition cursor-pointer ${
                         isCurrent
-                          ? "border-indigo-600 bg-indigo-950 text-white shadow-xs ring-1 ring-indigo-500/30"
-                          : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                          ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-xs ring-1 ring-[#FF4D3D]/40"
+                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
                       }`}
                     >
                       <span className="text-xs font-bold leading-tight">{modeItem.label}</span>
-                      <span className={`text-[9.5px] font-mono mt-0.5 ${isCurrent ? "text-indigo-200" : "text-zinc-500"}`}>
+                      <span className={`text-[9.5px] font-mono mt-0.5 ${isCurrent ? "text-[#FF4D3D]" : "text-[#777777]"}`}>
                         {modeItem.desc}
                       </span>
                     </button>
@@ -1528,8 +1559,8 @@ export default function InterviewSimulator() {
             {/* AI Interviewer Persona Selector */}
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">AI Interviewer Persona</h2>
-                <span className="rounded bg-purple-100 text-purple-900 px-2 py-0.5 text-[10px] font-bold font-mono">
+                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">AI Interviewer Persona</h2>
+                <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
                   {activePersona.avatarEmoji} {activePersona.name}
                 </span>
               </div>
@@ -1544,15 +1575,15 @@ export default function InterviewSimulator() {
                       onClick={() => updateProfile("personaId", persona.id)}
                       className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
                         isSelected
-                          ? "border-purple-600 bg-gradient-to-r from-purple-950 to-slate-900 text-white shadow-md ring-1 ring-purple-500/30"
-                          : "border-zinc-200 bg-white text-zinc-800 hover:border-purple-300 hover:bg-purple-50/40"
+                          ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-md ring-1 ring-[#FF4D3D]/40"
+                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
                       }`}
                     >
                       {/* Avatar container */}
                       <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
                         isSelected
-                          ? "bg-purple-800/60 border border-purple-500/40"
-                          : "bg-zinc-100 group-hover:bg-purple-100/70 border border-zinc-200/80"
+                          ? "bg-[#FF4D3D]/20 border border-[#FF4D3D]/40"
+                          : "bg-[#0e0e0e] border border-[#222222]"
                       }`}>
                         {persona.avatarEmoji}
                       </div>
@@ -1560,19 +1591,19 @@ export default function InterviewSimulator() {
                       {/* Info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1.5">
-                          <span className="font-bold text-xs leading-tight truncate">
+                          <span className="font-bold text-xs leading-tight truncate text-[#F5F5F5]">
                             {persona.name}
                           </span>
                           <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
                             isSelected
-                              ? "bg-purple-500/30 text-purple-200 border border-purple-400/30"
-                              : persona.badgeBg
+                              ? "bg-[#FF4D3D]/20 text-[#FF4D3D] border border-[#FF4D3D]/30"
+                              : "bg-[#222222] text-[#A0A0A0]"
                           }`}>
                             {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
                           </span>
                         </div>
                         <p className={`mt-0.5 text-[11px] leading-snug truncate ${
-                          isSelected ? "text-purple-200" : "text-zinc-500"
+                          isSelected ? "text-[#FF4D3D]/80" : "text-[#777777]"
                         }`}>
                           {persona.tagline}
                         </p>
@@ -1582,8 +1613,8 @@ export default function InterviewSimulator() {
                       <div className="shrink-0">
                         <div className={`size-4 rounded-full border flex items-center justify-center transition ${
                           isSelected
-                            ? "border-emerald-400 bg-emerald-500 text-white"
-                            : "border-zinc-300 bg-transparent group-hover:border-purple-400"
+                            ? "border-[#FF4D3D] bg-[#FF4D3D] text-white"
+                            : "border-[#444444] bg-transparent group-hover:border-[#FF4D3D]"
                         }`}>
                           {isSelected && <div className="size-1.5 rounded-full bg-white" />}
                         </div>
@@ -1593,24 +1624,24 @@ export default function InterviewSimulator() {
                 })}
               </div>
 
-              {/* Configurable Stress Mode Settings Panel (Shown when Stress Interviewer selected) */}
+              {/* Configurable Stress Mode Settings Panel */}
               {profile.personaId === "stress_interviewer" && (
-                <div className="mt-3 rounded-xl border border-rose-300/80 bg-rose-50/70 p-3.5 text-xs text-rose-950 space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between border-b border-rose-200 pb-2">
-                    <div className="flex items-center gap-2 font-bold">
+                <div className="mt-3 rounded-xl border border-[#FF4D3D]/40 bg-[#1a0f0f] p-3.5 text-xs text-[#F5F5F5] space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-[#FF4D3D]/20 pb-2">
+                    <div className="flex items-center gap-2 font-bold text-[#FF4D3D]">
                       <span>😈 Stress Mode Configuration</span>
-                      <span className="rounded bg-rose-200 px-2 py-0.5 text-[10px] font-mono font-bold text-rose-900">
-                        Configurable Pressure
+                      <span className="rounded bg-[#FF4D3D]/20 px-2 py-0.5 text-[10px] font-mono font-bold text-[#FF4D3D]">
+                        Pressure HUD
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono text-rose-800">
+                    <span className="text-[10px] font-mono text-[#A0A0A0]">
                       Intensity: {profile.stressConfig?.intensity ?? "moderate"}
                     </span>
                   </div>
 
                   {/* Intensity Selector */}
                   <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-rose-900">Time Pressure Intensity:</span>
+                    <span className="text-[11px] font-bold text-[#A0A0A0]">Time Pressure Intensity:</span>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: "mild", label: "Mild (60s)", time: 60 },
@@ -1633,8 +1664,8 @@ export default function InterviewSimulator() {
                             }}
                             className={`rounded-lg border p-2 text-center text-xs font-bold transition cursor-pointer ${
                               isCurrent
-                                ? "border-rose-600 bg-rose-600 text-white shadow-xs"
-                                : "border-rose-200 bg-white text-rose-800 hover:bg-rose-100"
+                                ? "border-[#FF4D3D] bg-[#FF4D3D] text-white shadow-xs"
+                                : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-white"
                             }`}
                           >
                             {lvl.label}
@@ -1659,9 +1690,9 @@ export default function InterviewSimulator() {
                             enableTimePressureClock: e.target.checked,
                           });
                         }}
-                        className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                        className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
                       />
-                      <span className="font-semibold text-rose-900">Live Countdown HUD Clock</span>
+                      <span className="font-semibold text-[#A0A0A0]">Live Countdown HUD Clock</span>
                     </label>
 
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1677,77 +1708,71 @@ export default function InterviewSimulator() {
                             enableInterruptions: e.target.checked,
                           });
                         }}
-                        className="rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                        className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
                       />
-                      <span className="font-semibold text-rose-900">Mid-Turn Rapid Probing</span>
+                      <span className="font-semibold text-[#A0A0A0]">Mid-Turn Rapid Probing</span>
                     </label>
-                  </div>
-
-                  {/* Guardrail Safety Disclaimer */}
-                  <div className="rounded border border-rose-200 bg-white/70 p-2 text-[10.5px] text-rose-800 italic leading-tight">
-                    <span className="font-bold not-italic">Professional Guardrail: </span>
-                    Stress mode rigorously tests brevity and composure under tight deadlines without derogatory, abusive, or hostile language.
                   </div>
                 </div>
               )}
             </section>
 
             {/* Candidate Persistent Digital Profile Summary Card */}
-            <section className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/60 to-indigo-50/60 p-3 text-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-purple-950">
-                  <Fingerprint size={15} className="text-purple-600" />
+            <section className="rounded-xl border border-[#222222] bg-[#141414] p-3 text-xs space-y-2.5">
+              <div className="flex items-center justify-between border-b border-[#222222] pb-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-[#F5F5F5]">
+                  <Fingerprint size={15} className="text-[#FF4D3D]" />
                   <span>Persistent Digital Profile</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(true)}
-                  className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
+                  className="text-[10px] font-bold text-[#FF4D3D] hover:underline cursor-pointer"
                 >
                   View Full Profile →
                 </button>
               </div>
 
               <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Technical</div>
-                  <div className="text-xs font-bold text-blue-700">{digitalProfile.pillars.technical.score}%</div>
+                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Technical</div>
+                  <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.score}%</div>
                 </div>
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Communication</div>
-                  <div className="text-xs font-bold text-emerald-700">{digitalProfile.pillars.communication.score}%</div>
+                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Communication</div>
+                  <div className="text-xs font-bold text-emerald-400">{digitalProfile.pillars.communication.score}%</div>
                 </div>
-                <div className="rounded bg-white/80 p-1.5 border border-purple-100 shadow-2xs">
-                  <div className="text-[9px] text-zinc-500 font-semibold uppercase">Behavioral</div>
-                  <div className="text-xs font-bold text-purple-700">{digitalProfile.pillars.behavioral.score}%</div>
+                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Behavioral</div>
+                  <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.behavioral.score}%</div>
                 </div>
               </div>
 
               {/* Sample Top Key Skills */}
-              <div className="space-y-1 text-[10.5px] font-mono text-zinc-700">
-                <div className="flex items-center justify-between text-zinc-500 text-[10px]">
+              <div className="space-y-1 text-[10.5px] font-mono text-[#A0A0A0]">
+                <div className="flex items-center justify-between text-[#666666] text-[10px]">
                   <span>Tracked Skill Vector</span>
                   <span>Proficiency</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Python</span>
-                  <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
+                  <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Machine Learning</span>
-                  <span className="font-bold text-emerald-700">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
+                  <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>SQL Optimization</span>
-                  <span className="font-bold text-amber-700">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
+                  <span className="font-bold text-amber-400">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>RAG & LLM Architectures</span>
-                  <span className="font-bold text-rose-700">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
+                  <span className="font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
                 </div>
               </div>
 
-              <div className="text-[10px] text-purple-900/80 bg-purple-100/60 rounded px-2 py-1 italic">
+              <div className="text-[10px] text-[#FF4D3D]/90 bg-[#FF4D3D]/10 rounded px-2 py-1 font-mono">
                 🧬 Future sessions start from this profile and probe priority growth areas.
               </div>
             </section>
@@ -1755,22 +1780,24 @@ export default function InterviewSimulator() {
             <button
               type="button"
               onClick={startInterview}
-              className="mt-auto flex h-11 items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              className="mt-auto flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-4 text-sm font-bold text-white shadow-lg shadow-[#FF4D3D]/25 transition hover:brightness-110 active:scale-95 cursor-pointer"
             >
-              <Play size={17} fill="currentColor" />
-              Start Interview
+              <Play size={16} fill="currentColor" />
+              <span>{stage === "live" ? "Restart Interview" : "Start Interview"}</span>
             </button>
           </aside>
 
-          <section className="flex min-h-[720px] flex-col overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
+          <section className="flex min-h-[720px] flex-col overflow-hidden rounded-2xl border border-[#222222] bg-[#111111] shadow-xl text-[#F5F5F5]">
             <div className="grid flex-1 grid-rows-[minmax(240px,42vh)_1fr]">
-              <div className="relative bg-zinc-950">
+              <div className="relative bg-[#080808]">
                 <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted playsInline />
                 {!cameraEnabled ? (
-                  <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_30%,#2f4f4b_0,#101312_42%,#080808_100%)]">
+                  <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_50%_30%,rgba(255,77,61,0.08)_0,#0f0f0f_45%,#080808_100%)]">
                     <div className="text-center text-white">
-                      <VideoOff className="mx-auto mb-3 text-zinc-300" size={34} />
-                      <p className="text-sm font-medium text-zinc-200">Camera off</p>
+                      <div className="mx-auto mb-3 grid size-14 place-items-center rounded-2xl border border-[#262626] bg-[#151515] text-[#A0A0A0] shadow-inner">
+                        <VideoOff size={26} />
+                      </div>
+                      <p className="text-xs font-mono font-medium text-[#A0A0A0]">Camera inactive • Tap toggle below</p>
                     </div>
                   </div>
                 ) : null}
@@ -1778,32 +1805,34 @@ export default function InterviewSimulator() {
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className="grid size-10 place-items-center rounded-md bg-white/92 text-zinc-950 shadow-sm backdrop-blur transition hover:bg-white"
+                    className="grid size-10 place-items-center rounded-xl bg-[#151515]/90 border border-[#2A2A2A] text-[#F5F5F5] shadow-sm backdrop-blur transition hover:border-[#FF4D3D]/50 hover:bg-[#1f1f1f] cursor-pointer"
                     aria-label={cameraEnabled ? "Turn camera off" : "Turn camera on"}
                     title={cameraEnabled ? "Turn camera off" : "Turn camera on"}
                   >
-                    {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
+                    {cameraEnabled ? <Video size={18} className="text-[#FF4D3D]" /> : <VideoOff size={18} />}
                   </button>
                   <button
                     type="button"
                     onClick={toggleMic}
-                    className="grid size-10 place-items-center rounded-md bg-white/92 text-zinc-950 shadow-sm backdrop-blur transition hover:bg-white"
+                    className="grid size-10 place-items-center rounded-xl bg-[#151515]/90 border border-[#2A2A2A] text-[#F5F5F5] shadow-sm backdrop-blur transition hover:border-[#FF4D3D]/50 hover:bg-[#1f1f1f] cursor-pointer"
                     aria-label={micEnabled ? "Turn microphone off" : "Turn microphone on"}
                     title={micEnabled ? "Turn microphone off" : "Turn microphone on"}
                   >
-                    {micEnabled ? <Mic size={18} /> : <MicOff size={18} />}
+                    {micEnabled ? <Mic size={18} className="text-[#FF4D3D]" /> : <MicOff size={18} />}
                   </button>
                   <button
                     type="button"
                     onClick={toggleRecording}
                     disabled={!micEnabled}
-                    className={`grid size-10 place-items-center rounded-md text-zinc-950 shadow-sm backdrop-blur transition ${
-                      isRecording ? "bg-rose-600 text-white animate-pulse" : "bg-white/92 hover:bg-white"
+                    className={`grid size-10 place-items-center rounded-xl text-[#F5F5F5] shadow-sm backdrop-blur transition cursor-pointer ${
+                      isRecording
+                        ? "bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] text-white animate-pulse shadow-md shadow-[#FF4D3D]/30"
+                        : "bg-[#151515]/90 border border-[#2A2A2A] hover:border-[#FF4D3D]/50 hover:bg-[#1f1f1f]"
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                     aria-label={isRecording ? "Stop recording" : "Record answer"}
                     title={isRecording ? "Stop recording" : "Record answer"}
                   >
-                    {isRecording ? <Square size={17} fill="currentColor" /> : <AudioWaveform size={18} />}
+                    {isRecording ? <Square size={16} fill="currentColor" /> : <AudioWaveform size={18} />}
                   </button>
                 </div>
 
@@ -1813,27 +1842,27 @@ export default function InterviewSimulator() {
                     <button
                       type="button"
                       onClick={() => setShowIntegrityModal(true)}
-                      className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition cursor-pointer ${
+                      className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition cursor-pointer ${
                         integrityState.integrityScore >= 85
-                          ? "bg-zinc-950/85 text-emerald-300 border border-emerald-500/30 hover:bg-zinc-900"
-                          : "bg-amber-950/85 text-amber-300 border border-amber-500/30 hover:bg-amber-900"
+                          ? "bg-[#151515]/90 text-emerald-300 border border-emerald-500/30 hover:bg-[#1a1a1a]"
+                          : "bg-[#151515]/90 text-[#FF4D3D] border border-[#FF4D3D]/30 hover:bg-[#1a1a1a]"
                       }`}
                       title="Click to inspect full Integrity & Focus Telemetry"
                     >
-                      <ShieldCheck size={13} className={integrityState.integrityScore >= 85 ? "text-emerald-400" : "text-amber-400"} />
+                      <ShieldCheck size={13} className={integrityState.integrityScore >= 85 ? "text-emerald-400" : "text-[#FF4D3D]"} />
                       <span>Integrity {integrityState.integrityScore}%</span>
                     </button>
 
                     {eyeContactResult ? (
                       <div
-                        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition-all ${
+                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition-all ${
                           eyeContactResult.status === "looking"
-                            ? "bg-emerald-950/85 text-emerald-300 border border-emerald-500/30"
+                            ? "bg-[#151515]/90 text-emerald-300 border border-emerald-500/30"
                             : eyeContactResult.status === "distracted"
-                            ? "bg-amber-950/85 text-amber-300 border border-amber-500/30"
+                            ? "bg-[#151515]/90 text-amber-300 border border-amber-500/30"
                             : eyeContactResult.status === "eyes_closed"
-                            ? "bg-indigo-950/85 text-indigo-300 border border-indigo-500/30"
-                            : "bg-rose-950/85 text-rose-300 border border-rose-500/30"
+                            ? "bg-[#151515]/90 text-indigo-300 border border-indigo-500/30"
+                            : "bg-[#151515]/90 text-[#FF4D3D] border border-[#FF4D3D]/30"
                         }`}
                       >
                         <span
@@ -1844,7 +1873,7 @@ export default function InterviewSimulator() {
                               ? "bg-amber-400"
                               : eyeContactResult.status === "eyes_closed"
                               ? "bg-indigo-400"
-                              : "bg-rose-400"
+                              : "bg-[#FF4D3D]"
                           }`}
                         />
                         <span>
@@ -1858,8 +1887,8 @@ export default function InterviewSimulator() {
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 rounded-md bg-zinc-950/85 px-3 py-1.5 text-xs font-semibold text-zinc-300 shadow-sm backdrop-blur border border-zinc-700/50">
-                        <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+                      <div className="flex items-center gap-1.5 rounded-xl bg-[#151515]/90 px-3 py-1.5 text-xs font-semibold text-[#A0A0A0] shadow-sm backdrop-blur border border-[#2A2A2A]">
+                        <span className="size-2 rounded-full bg-[#FF4D3D] animate-ping" />
                         <span>Tracking Gaze...</span>
                       </div>
                     )}
@@ -1905,19 +1934,19 @@ export default function InterviewSimulator() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 p-4 lg:p-5">
-                <div className="rounded-md border border-zinc-200 bg-[#fbfcfa] p-4">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+              <div className="flex flex-col gap-4 p-4 lg:p-5 bg-[#0f0f0f]">
+                <div className="rounded-2xl border border-[#222222] bg-[#151515] p-5 shadow-sm">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[#F5F5F5]">
                       <span className="text-2xl">{activePersona.avatarEmoji}</span>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs text-zinc-900 leading-tight">{activePersona.name}</span>
-                          <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold ${activePersona.badgeBg}`}>
+                          <span className="font-bold text-xs text-[#F5F5F5] leading-tight">{activePersona.name}</span>
+                          <span className="rounded bg-[#FF4D3D]/10 px-1.5 py-0.2 text-[9px] font-mono font-bold text-[#FF4D3D] border border-[#FF4D3D]/25">
                             {activePersona.role}
                           </span>
                         </div>
-                        <div className="text-[10px] font-mono text-zinc-500 font-normal">{activePersona.tagline}</div>
+                        <div className="text-[10px] font-mono text-[#A0A0A0] font-normal">{activePersona.tagline}</div>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1931,39 +1960,33 @@ export default function InterviewSimulator() {
                             setPendingAttempt1(null);
                           }
                         }}
-                        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition border cursor-pointer ${
+                        className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold transition border cursor-pointer ${
                           isABMode
-                            ? "border-purple-400 bg-purple-100 text-purple-900 shadow-2xs ring-1 ring-purple-400"
-                            : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
+                            ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-2xs ring-1 ring-[#FF4D3D]/30"
+                            : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-white"
                         }`}
                         title="A/B Training Mode: Answer each question twice to evaluate side-by-side improvements"
                       >
-                        <FlaskConical size={13} className={isABMode ? "text-purple-700 animate-pulse" : "text-zinc-500"} />
+                        <FlaskConical size={13} className={isABMode ? "text-[#FF4D3D] animate-pulse" : "text-[#A0A0A0]"} />
                         <span>A/B Training: {isABMode ? "ACTIVE" : "OFF"}</span>
                         {isABMode && (
-                          <span className="rounded bg-purple-700 px-1 py-0.2 text-[9px] font-mono text-white">
-                            {currentAttempt === 1 ? "Attempt 1/2" : "Attempt 2/2"}
+                          <span className="rounded bg-[#FF4D3D] px-1 py-0.2 text-[9px] font-mono text-white">
+                            {currentAttempt === 1 ? "1/2" : "2/2"}
                           </span>
                         )}
                       </button>
 
-                      <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
-                        Q{Math.min(questionIndex + 1, 6)} / 6
-                      </span>
-                      <span
-                        className={`rounded-md px-2 py-1 text-xs font-bold font-mono ${
-                          dynamicDifficulty === "Senior"
-                            ? "bg-rose-100 text-rose-800 border border-rose-200"
-                            : dynamicDifficulty === "Standard"
-                            ? "bg-blue-100 text-blue-800 border border-blue-200"
-                            : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                        }`}
-                      >
+                      {stage !== "setup" && (
+                        <span className="rounded-xl bg-[#0c0c0c] border border-[#222222] px-2.5 py-1 text-xs font-mono font-semibold text-[#F5F5F5]">
+                          Q{Math.min(questionIndex + 1, 6)} / 6
+                        </span>
+                      )}
+                      <span className="rounded-xl bg-[#FF4D3D]/10 border border-[#FF4D3D]/25 px-2.5 py-1 text-xs font-bold font-mono text-[#FF4D3D]">
                         {dynamicDifficulty === "Senior"
-                          ? "Level 3: Hard (Senior)"
+                          ? "Level 3: Hard"
                           : dynamicDifficulty === "Standard"
-                          ? "Level 2: Medium (Standard)"
-                          : "Level 1: Easy (Warmup)"}
+                          ? "Level 2: Standard"
+                          : "Level 1: Warmup"}
                       </span>
                     </div>
                   </div>
@@ -1999,20 +2022,31 @@ export default function InterviewSimulator() {
                     </div>
                   )}
 
-                  <p className="text-lg font-semibold leading-8 text-zinc-950">{currentQuestion}</p>
+                  {stage !== "setup" && currentQuestion && (
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 animate-in fade-in">
+                      <p className="text-lg font-semibold leading-8 text-[#F5F5F5] flex-1">{currentQuestion}</p>
+                      <CopyButton
+                        text={currentQuestion}
+                        label="Copy"
+                        size="sm"
+                        className="self-start shrink-0"
+                      />
+                    </div>
+                  )}
+
 
                   {/* Digital Profile Skill Calibration Delta Card (Post-Interview) */}
                   {stage === "complete" && sessionSkillDeltas.length > 0 && (
-                    <div className="mt-3 rounded-xl border border-purple-300 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 p-3.5 shadow-xs space-y-2 animate-in fade-in">
-                      <div className="flex items-center justify-between border-b border-purple-200/80 pb-1.5">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-purple-950">
-                          <Fingerprint size={15} className="text-purple-600" />
+                    <div className="mt-3 rounded-xl border border-[#FF4D3D]/30 bg-[#161111] p-3.5 shadow-sm space-y-2 animate-in fade-in">
+                      <div className="flex items-center justify-between border-b border-[#FF4D3D]/20 pb-1.5">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-[#F5F5F5]">
+                          <Fingerprint size={15} className="text-[#FF4D3D]" />
                           <span>Candidate Digital Profile Calibrated (+{sessionSkillDeltas.length} Skill Updates)</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => setShowProfileModal(true)}
-                          className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
+                          className="text-[10px] font-bold text-[#FF4D3D] hover:underline cursor-pointer"
                         >
                           View Full Digital Profile →
                         </button>
@@ -2020,11 +2054,11 @@ export default function InterviewSimulator() {
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
                         {sessionSkillDeltas.map((delta) => (
-                          <div key={delta.skillName} className="rounded-lg bg-white/90 p-2 border border-purple-100 shadow-2xs">
-                            <div className="text-[10px] text-zinc-500 truncate">{delta.skillName}</div>
+                          <div key={delta.skillName} className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                            <div className="text-[10px] text-[#A0A0A0] truncate">{delta.skillName}</div>
                             <div className="flex items-center justify-between mt-0.5">
-                              <span className="font-bold text-zinc-900">{delta.newScore}</span>
-                              <span className={`text-[10px] font-bold ${delta.delta >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                              <span className="font-bold text-[#F5F5F5]">{delta.newScore}</span>
+                              <span className={`text-[10px] font-bold ${delta.delta >= 0 ? "text-emerald-400" : "text-[#FF4D3D]"}`}>
                                 {delta.delta >= 0 ? `+${delta.delta}` : delta.delta}
                               </span>
                             </div>
@@ -2256,22 +2290,24 @@ export default function InterviewSimulator() {
                   )}
 
                   {/* Live Integrity Monitor Summary Card */}
-                  <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50/90 p-3 text-xs text-zinc-800 shadow-2xs">
+                  <div className="mt-3 rounded-xl border border-[#222222] bg-[#0c0c0c] p-3 text-xs text-[#F5F5F5] shadow-sm">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-zinc-800">
-                        <ShieldCheck size={14} className={integrityState.integrityScore >= 85 ? "text-emerald-600" : "text-amber-600"} />
+                      <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[#A0A0A0]">
+                        <ShieldCheck size={14} className={integrityState.integrityScore >= 85 ? "text-emerald-400" : "text-[#FF4D3D]"} />
                         Integrity Monitor
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className={`rounded px-1.5 py-0.2 text-[10px] font-mono font-bold ${
-                          integrityState.integrityScore >= 85 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                        <span className={`rounded px-1.5 py-0.2 text-[10px] font-mono font-bold border ${
+                          integrityState.integrityScore >= 85
+                            ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/40"
+                            : "bg-[#281113] text-[#FF4D3D] border-[#FF4D3D]/30"
                         }`}>
                           {integrityState.integrityScore}% {integrityState.integrityLevel}
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowIntegrityModal(true)}
-                          className="text-[10px] font-semibold text-zinc-500 hover:text-zinc-900 underline cursor-pointer"
+                          className="text-[10px] font-semibold text-[#A0A0A0] hover:text-[#F5F5F5] underline cursor-pointer"
                         >
                           Telemetry Log
                         </button>
@@ -2280,12 +2316,12 @@ export default function InterviewSimulator() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-mono">
                       {integrityState.diagnosticChecks.slice(0, 4).map((chk) => (
-                        <div key={chk.id} className="flex items-center justify-between rounded bg-white px-2 py-1 border border-zinc-200/80">
-                          <span className="flex items-center gap-1.5 text-zinc-700">
-                            <span className={chk.status === "pass" ? "text-emerald-600 font-bold" : chk.status === "warn" ? "text-amber-600 font-bold" : "text-rose-600 font-bold"}>
+                        <div key={chk.id} className="flex items-center justify-between rounded-lg bg-[#151515] px-2.5 py-1.5 border border-[#222222]">
+                          <span className="flex items-center gap-1.5 text-[#A0A0A0]">
+                            <span className={chk.status === "pass" ? "text-emerald-400 font-bold" : chk.status === "warn" ? "text-amber-400 font-bold" : "text-[#FF4D3D] font-bold"}>
                               {chk.symbol}
                             </span>
-                            <span>{chk.label}</span>
+                            <span className="text-[#F5F5F5]">{chk.label}</span>
                           </span>
                         </div>
                       ))}
@@ -2369,9 +2405,10 @@ export default function InterviewSimulator() {
 
                       <button
                         type="button"
-                        onClick={resetSession}
-                        className="flex h-11 items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-4 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition"
+                        onClick={handlePromptReset}
+                        className="flex h-11 items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-4 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
                       >
+
                         <RotateCcw size={14} />
                         <span>Start New Session</span>
                       </button>
@@ -2633,44 +2670,44 @@ export default function InterviewSimulator() {
                 ) : (
                   <div className="flex flex-1 flex-col gap-3">
                     {pendingAttempt1 && (
-                      <div className="rounded-xl border border-purple-300/80 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 p-4 shadow-sm animate-in fade-in">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-200/80 pb-2.5 mb-2.5">
+                      <div className="rounded-xl border border-[#FF4D3D]/30 bg-[#161111] p-4 shadow-sm animate-in fade-in">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#FF4D3D]/20 pb-2.5 mb-2.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="grid size-7 place-items-center rounded-md bg-purple-600 text-white font-bold font-mono text-xs">
+                            <div className="grid size-7 place-items-center rounded-md bg-[#FF4D3D] text-white font-bold font-mono text-xs shadow-sm">
                               A1
                             </div>
                             <div>
-                              <h4 className="text-xs font-bold text-purple-950">Attempt 1 Baseline Stored</h4>
-                              <p className="text-[11px] text-purple-800">Deliver Attempt 2 below to apply feedback and measure your improvement delta.</p>
+                              <h4 className="text-xs font-bold text-[#F5F5F5]">Attempt 1 Baseline Stored</h4>
+                              <p className="text-[11px] text-[#A0A0A0]">Deliver Attempt 2 below to apply feedback and measure your improvement delta.</p>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={cancelAttempt2}
-                            className="rounded-md border border-purple-300 bg-white px-2.5 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100 transition cursor-pointer"
+                            className="rounded-md border border-[#262626] bg-[#111111] px-2.5 py-1 text-xs font-semibold text-[#A0A0A0] hover:text-[#F5F5F5] hover:border-[#FF4D3D]/50 transition cursor-pointer"
                           >
                             ✕ Cancel Attempt 2 & Keep Attempt 1
                           </button>
                         </div>
 
                         <div className="grid grid-cols-3 gap-2.5 text-center">
-                          <div className="rounded-lg bg-white/90 p-2 border border-purple-200">
-                            <div className="text-[10px] font-mono font-semibold uppercase text-purple-600">Technical</div>
-                            <div className="text-base font-bold text-purple-950">{pendingAttempt1.technicalScore} / 100</div>
+                          <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                            <div className="text-[10px] font-mono font-semibold uppercase text-[#A0A0A0]">Technical</div>
+                            <div className="text-base font-bold text-[#F5F5F5] font-mono">{pendingAttempt1.technicalScore} / 100</div>
                           </div>
-                          <div className="rounded-lg bg-white/90 p-2 border border-purple-200">
-                            <div className="text-[10px] font-mono font-semibold uppercase text-purple-600">Communication</div>
-                            <div className="text-base font-bold text-purple-950">{pendingAttempt1.communicationScore} / 100</div>
+                          <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                            <div className="text-[10px] font-mono font-semibold uppercase text-[#A0A0A0]">Communication</div>
+                            <div className="text-base font-bold text-[#F5F5F5] font-mono">{pendingAttempt1.communicationScore} / 100</div>
                           </div>
-                          <div className="rounded-lg bg-white/90 p-2 border border-purple-200">
-                            <div className="text-[10px] font-mono font-semibold uppercase text-purple-600">Overall Score</div>
-                            <div className="text-base font-bold text-purple-950">{pendingAttempt1.score} / 100</div>
+                          <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                            <div className="text-[10px] font-mono font-semibold uppercase text-[#A0A0A0]">Overall Score</div>
+                            <div className="text-base font-bold text-[#FF4D3D] font-mono">{pendingAttempt1.score} / 100</div>
                           </div>
                         </div>
 
                         {pendingAttempt1.feedback.length > 0 && (
-                          <div className="mt-2 text-[11px] text-purple-900 leading-relaxed font-medium">
-                            <strong className="text-purple-950">AI Training Tip for Attempt 2: </strong>
+                          <div className="mt-2 text-[11px] text-[#F5F5F5] leading-relaxed font-medium bg-[#0c0c0c] p-2.5 rounded-lg border border-[#222222]">
+                            <strong className="text-[#FF4D3D]">AI Training Tip for Attempt 2: </strong>
                             {pendingAttempt1.feedback[0]}
                           </div>
                         )}
@@ -2681,44 +2718,55 @@ export default function InterviewSimulator() {
                     {profile.inputMode !== "text_only" && (
                       <div className="space-y-2">
                         {voiceAnswerState === "idle" && (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-200/80 bg-gradient-to-r from-purple-50/70 to-indigo-50/70 p-3 shadow-2xs">
-                            <div className="flex items-center gap-2.5">
-                              <div className="grid size-9 place-items-center rounded-lg bg-purple-600 text-white shadow-2xs">
-                                <Mic size={17} />
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#262626] bg-gradient-to-r from-[#141414] via-[#111111] to-[#141414] p-3.5 shadow-lg hover:border-[#FF4D3D]/40 transition-all duration-200">
+                            <div className="flex items-center gap-3">
+                              <div className="grid size-10 place-items-center rounded-xl bg-[#1c0f0f] text-[#FF4D3D] border border-[#FF4D3D]/30 shadow-[0_0_15px_rgba(255,77,61,0.2)]">
+                                <Mic size={18} />
                               </div>
                               <div>
-                                <div className="flex items-center gap-1.5 font-bold text-xs text-purple-950">
-                                  <span>🎤 Optional Voice Answer</span>
-                                  <span className="rounded bg-purple-200/70 text-purple-900 px-1.5 py-0.2 text-[9px] font-mono font-bold">Whisper STT</span>
+                                <div className="flex items-center gap-2 font-bold text-xs text-[#F5F5F5] uppercase tracking-wide">
+                                  <span>Optional Voice Answer</span>
+                                  <span className="rounded bg-[#1a1111] text-[#FF4D3D] border border-[#FF4D3D]/30 px-2 py-0.5 text-[9.5px] font-mono font-bold tracking-wider">
+                                    WHISPER STT
+                                  </span>
                                 </div>
-                                <p className="text-[11px] text-purple-800/80">Microphone is off until you click Start Voice Answer.</p>
+                                <p className="text-[11px] text-[#A0A0A0] flex items-center gap-1.5 mt-0.5">
+                                  <span className="size-1.5 rounded-full bg-[#555555]"></span>
+                                  Microphone is inactive · Click to activate streaming speech transcription.
+                                </p>
                               </div>
                             </div>
                             <button
                               type="button"
                               onClick={startVoiceAnswerRecording}
-                              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:from-purple-500 hover:to-indigo-500 transition cursor-pointer"
+                              disabled={stage !== "live"}
+                              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold transition-all tracking-wide ${
+                                stage === "live"
+                                  ? "bg-[#FF4D3D] hover:bg-[#e63e2e] active:scale-95 text-white shadow-[0_0_20px_rgba(255,77,61,0.3)] hover:shadow-[0_0_25px_rgba(255,77,61,0.45)] cursor-pointer"
+                                  : "bg-[#222222] text-[#666666] cursor-not-allowed opacity-60"
+                              }`}
+                              title={stage !== "live" ? "Click 'Start Interview' first to begin" : undefined}
                             >
-                              <Mic size={14} />
+                              <Mic size={14} className={stage === "live" ? "animate-pulse" : ""} />
                               <span>Start Voice Answer</span>
                             </button>
                           </div>
                         )}
 
                         {voiceAnswerState === "recording" && (
-                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50/95 p-3 shadow-sm animate-in fade-in">
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#FF4D3D]/60 bg-[#1f0e0e] p-3.5 shadow-[0_0_25px_rgba(255,77,61,0.25)] animate-in fade-in">
                             <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2 font-mono font-bold text-xs text-rose-700">
-                                <span className="size-3 rounded-full bg-rose-600 animate-ping" />
-                                <span>🔴 Recording...</span>
-                                <span className="text-sm text-rose-950 font-bold ml-1">
+                              <div className="flex items-center gap-2 font-mono font-bold text-xs text-[#FF4D3D]">
+                                <span className="size-2.5 rounded-full bg-[#FF4D3D] animate-ping" />
+                                <span>RECORDING ACTIVE</span>
+                                <span className="text-sm text-white font-bold ml-1 font-mono">
                                   {String(Math.floor(voiceRecordingSeconds / 60)).padStart(2, "0")}:{String(voiceRecordingSeconds % 60).padStart(2, "0")}
                                 </span>
                               </div>
                               {/* Live VU Meter */}
-                              <div className="w-28 sm:w-44 h-2 bg-rose-200 rounded-full overflow-hidden">
+                              <div className="w-28 sm:w-44 h-2 bg-[#151515] rounded-full overflow-hidden border border-[#262626]">
                                 <div
-                                  className="h-full bg-rose-600 transition-all duration-100"
+                                  className="h-full bg-[#FF4D3D] transition-all duration-100"
                                   style={{ width: `${Math.min(100, Math.max(15, voiceSignal.energy))}%` }}
                                 />
                               </div>
@@ -2726,7 +2774,7 @@ export default function InterviewSimulator() {
                             <button
                               type="button"
                               onClick={stopVoiceAnswerRecording}
-                              className="flex items-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-lg bg-[#D9362B] hover:bg-[#c02f25] active:scale-95 px-4 py-2 text-xs font-bold text-white shadow-[0_0_15px_rgba(217,54,43,0.3)] transition-all cursor-pointer"
                             >
                               <Square size={13} fill="currentColor" />
                               <span>Stop Recording & Transcribe</span>
@@ -2735,23 +2783,23 @@ export default function InterviewSimulator() {
                         )}
 
                         {voiceAnswerState === "processing" && (
-                          <div className="flex items-center justify-between gap-2 rounded-xl border border-purple-300 bg-purple-50/90 p-3 font-mono text-xs text-purple-900 animate-pulse">
+                          <div className="flex items-center justify-between gap-2 rounded-xl border border-[#FF4D3D]/30 bg-[#161111] p-3.5 font-mono text-xs text-[#F5F5F5] animate-pulse">
                             <div className="flex items-center gap-2 font-bold">
-                              <Sparkles size={16} className="text-purple-600 animate-spin" />
+                              <Sparkles size={16} className="text-[#FF4D3D] animate-spin" />
                               <span>Transcribing speech via Whisper & applying technical lexicon normalization...</span>
                             </div>
                           </div>
                         )}
 
                         {voiceAnswerState === "ready" && voiceTranscriptBundle && (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50/90 p-2.5 text-xs font-mono text-emerald-950 animate-in fade-in">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-800/40 bg-[#0c1f15] p-3 text-xs font-mono text-emerald-300 animate-in fade-in">
                             <div className="flex items-center gap-2">
-                              <CheckCircle2 size={16} className="text-emerald-700" />
+                              <CheckCircle2 size={16} className="text-emerald-400" />
                               <span className="font-bold">
                                 Transcribed: {voiceTranscriptBundle.delivery.wordCount} words · {voiceTranscriptBundle.delivery.wpm} WPM · {voiceTranscriptBundle.delivery.durationSeconds}s
                               </span>
                               {voiceTranscriptBundle.correctionsApplied.length > 0 && (
-                                <span className="rounded bg-emerald-200 text-emerald-900 px-1.5 py-0.2 text-[10px] font-bold">
+                                <span className="rounded bg-emerald-950 text-emerald-300 border border-emerald-800/40 px-1.5 py-0.2 text-[10px] font-bold">
                                   {voiceTranscriptBundle.correctionsApplied.length} tech terms normalized
                                 </span>
                               )}
@@ -2759,7 +2807,7 @@ export default function InterviewSimulator() {
                             <button
                               type="button"
                               onClick={startVoiceAnswerRecording}
-                              className="text-[11px] font-bold text-emerald-800 hover:underline cursor-pointer"
+                              className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
                             >
                               Re-record Voice Answer ↺
                             </button>
@@ -2768,33 +2816,38 @@ export default function InterviewSimulator() {
                       </div>
                     )}
 
-                    <label className="flex flex-1 flex-col gap-2 text-sm font-medium text-zinc-700">
+                    <label className="flex flex-1 flex-col gap-2 text-xs font-semibold text-[#A0A0A0]">
                       <div className="flex items-center justify-between">
                         <span>
                           {pendingAttempt1 ? "Attempt 2 Response (Coached Iteration)" : isABMode ? "Attempt 1 Response (Baseline)" : "Answer (Editable Transcription)"}
                         </span>
                         {pendingAttempt1 ? (
-                          <span className="rounded bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-900 font-mono">
+                          <span className="rounded bg-[#FF4D3D]/15 px-2 py-0.5 text-[10px] font-bold text-[#FF4D3D] font-mono border border-[#FF4D3D]/30">
                             Attempt 2 of 2
                           </span>
                         ) : (
-                          <span className="font-mono text-[10px] text-zinc-500">
+                          <span className="font-mono text-[10px] text-[#777777]">
                             (Type directly or use voice answer above)
                           </span>
                         )}
                       </div>
                       <textarea
                         value={answer}
+                        disabled={stage !== "live"}
                         onChange={(event) => setAnswer(event.target.value)}
                         placeholder={
-                          pendingAttempt1
+                          stage !== "live"
+                            ? "Interview has not started. Click 'Start Interview' above or in the sidebar to generate your first question..."
+                            : pendingAttempt1
                             ? "Speak or type your improved Attempt 2 response applying the feedback above..."
                             : "Speak, type, or paste your response here."
                         }
-                        className={`min-h-48 flex-1 resize-none rounded-md border p-4 text-base leading-7 text-zinc-900 outline-none transition focus:bg-white ${
-                          pendingAttempt1
-                            ? "border-purple-300 bg-purple-50/30 focus:border-purple-500"
-                            : "border-zinc-200 bg-zinc-50 focus:border-emerald-500"
+                        className={`min-h-48 flex-1 resize-none rounded-xl border p-4 text-sm leading-relaxed text-[#F5F5F5] placeholder:text-[#555555] outline-none transition focus:border-[#FF4D3D] ${
+                          stage !== "live"
+                            ? "border-[#222222] bg-[#101010] cursor-not-allowed opacity-75"
+                            : pendingAttempt1
+                            ? "border-[#FF4D3D]/40 bg-[#1a0f0f] focus:border-[#FF4D3D]"
+                            : "border-[#262626] bg-[#141414] focus:border-[#FF4D3D]"
                         }`}
                       />
                     </label>
@@ -2802,22 +2855,22 @@ export default function InterviewSimulator() {
                 )}
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2 text-sm text-zinc-600">
+                  <div className="flex items-center gap-2 text-xs text-[#A0A0A0] font-mono">
                     {stage === "complete" ? (
                       <>
-                        <CheckCircle2 size={18} className="text-emerald-700" />
-                        Session scored
+                        <CheckCircle2 size={16} className="text-emerald-400" />
+                        <span>Session scored & calibrated</span>
                       </>
                     ) : (
                       <>
-                        <Activity size={18} className={isRecording ? "text-rose-600 animate-pulse" : "text-zinc-600"} />
+                        <Activity size={16} className={isRecording ? "text-[#FF4D3D] animate-pulse" : "text-[#777777]"} />
                         {isRecording ? (
-                          <span className="font-semibold text-rose-700">
+                          <span className="font-semibold text-[#FF4D3D]">
                             Recording speech ({speechState.wpm > 0 ? `${speechState.wpm} WPM · ${speechState.paceRating}` : `${speechState.wordsCount} words`})
                           </span>
                         ) : stage === "live" ? (
                           pendingAttempt1 ? (
-                            <span className="font-semibold text-purple-700">
+                            <span className="font-semibold text-[#FF4D3D]">
                               A/B Mode · Ready for Attempt 2
                             </span>
                           ) : (
@@ -2834,10 +2887,10 @@ export default function InterviewSimulator() {
                     <button
                       type="button"
                       onClick={openSampleABComparison}
-                      className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-purple-300/80 bg-purple-50 px-3 text-xs font-bold text-purple-900 hover:bg-purple-100 transition shadow-2xs cursor-pointer"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#262626] bg-[#151515] px-3 text-xs font-semibold text-[#A0A0A0] hover:text-white hover:border-[#FF4D3D]/50 transition cursor-pointer"
                       title="Preview A/B Comparison demonstration (+16 Overall, +14 Comm, +17 Tech)"
                     >
-                      <FlaskConical size={14} className="text-purple-700" />
+                      <FlaskConical size={14} className="text-[#FF4D3D]" />
                       <span>A/B Demo</span>
                     </button>
 
@@ -2845,28 +2898,28 @@ export default function InterviewSimulator() {
                     <button
                       type="button"
                       onClick={() => setShowReplayModal(true)}
-                      className={`flex h-11 items-center justify-center gap-2 rounded-md px-4 text-xs font-bold transition shadow-sm ${
+                      className={`flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-semibold transition cursor-pointer ${
                         stage === "complete"
-                          ? "bg-emerald-600 text-white hover:bg-emerald-500 ring-2 ring-emerald-400/30 cursor-pointer animate-pulse"
+                          ? "bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] text-white shadow-md shadow-[#FF4D3D]/25"
                           : history.length > 0
-                          ? "bg-zinc-900 text-white hover:bg-zinc-800 cursor-pointer"
-                          : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+                          ? "border border-[#262626] bg-[#151515] text-[#F5F5F5] hover:border-[#FF4D3D]/50"
+                          : "border border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-white"
                       }`}
                       title="Open interactive session replay mode with timeline scrubber"
                     >
-                      <RotateCcw size={15} />
-                      <span>Replay Interview</span>
+                      <RotateCcw size={14} />
+                      <span>Replay</span>
                     </button>
 
-                    {/* 7-Day Improvement Plan Button (Unlocked after test / all questions attempted) */}
+                    {/* 7-Day Improvement Plan Button */}
                     <button
                       type="button"
                       onClick={() => setShowRoadmapModal(true)}
                       disabled={completedQuestions < 6 && stage !== "complete"}
-                      className={`flex h-11 items-center justify-center gap-2 rounded-md px-3.5 text-xs font-semibold transition ${
+                      className={`flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-semibold transition cursor-pointer ${
                         completedQuestions >= 6 || stage === "complete"
-                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md hover:from-indigo-700 hover:to-purple-700 cursor-pointer"
-                          : "border border-zinc-200 bg-zinc-50 text-zinc-400 cursor-not-allowed opacity-60"
+                          ? "border border-[#FF4D3D]/40 bg-[#1c1414] text-[#F5F5F5] hover:border-[#FF4D3D]"
+                          : "border border-[#222222] bg-[#111111] text-[#555555] cursor-not-allowed opacity-50"
                       }`}
                       title={
                         completedQuestions >= 6 || stage === "complete"
@@ -2874,13 +2927,8 @@ export default function InterviewSimulator() {
                           : `Available after completing all 6 interview questions (${completedQuestions}/6 complete)`
                       }
                     >
-                      <Calendar size={15} className={completedQuestions >= 6 || stage === "complete" ? "text-indigo-200" : "text-zinc-400"} />
+                      <Calendar size={14} className="text-[#FF4D3D]" />
                       <span>7-Day Plan</span>
-                      {completedQuestions < 6 && stage !== "complete" ? (
-                        <span className="text-[10px] font-mono text-zinc-400">({completedQuestions}/6)</span>
-                      ) : (
-                        <span className="rounded bg-white/20 px-1.5 py-0.2 text-[9px] font-mono text-white">Ready</span>
-                      )}
                     </button>
                     <button
                       type="button"
@@ -2894,7 +2942,7 @@ export default function InterviewSimulator() {
                         setIsRecording(false);
                       }}
                       disabled={history.length === 0 && stage !== "live"}
-                      className="h-11 rounded-md border border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="h-10 rounded-xl border border-[#262626] bg-[#151515] px-3.5 text-xs font-semibold text-[#A0A0A0] transition hover:text-white hover:border-[#FF4D3D]/50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       End
                     </button>
@@ -2905,19 +2953,19 @@ export default function InterviewSimulator() {
                         <button
                           type="button"
                           onClick={cancelAttempt2}
-                          className="h-11 rounded-md border border-zinc-300 bg-white px-3.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition cursor-pointer"
+                          className="h-10 rounded-xl border border-[#262626] bg-[#151515] px-3.5 text-xs font-semibold text-[#A0A0A0] hover:text-white transition cursor-pointer"
                           title="Finalize current question with Attempt 1 and move to next question"
                         >
-                          Keep Attempt 1 & Next
+                          Keep Attempt 1
                         </button>
                         <button
                           type="button"
                           onClick={() => submitAnswer("ab_attempt")}
                           disabled={stage !== "live" || !answer.trim()}
-                          className="flex h-11 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-purple-600 to-indigo-600 px-5 text-sm font-bold text-white transition hover:from-purple-500 hover:to-indigo-500 shadow-md shadow-purple-500/20 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-4 text-xs font-bold text-white transition hover:brightness-110 shadow-md shadow-[#FF4D3D]/25 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                         >
-                          <Send size={16} />
-                          <span>Submit Attempt 2 & Measure Delta</span>
+                          <Send size={14} />
+                          <span>Submit Attempt 2</span>
                         </button>
                       </div>
                     ) : (
@@ -2927,22 +2975,22 @@ export default function InterviewSimulator() {
                             type="button"
                             onClick={() => submitAnswer("ab_attempt")}
                             disabled={stage !== "live" || !answer.trim()}
-                            className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-purple-300 bg-purple-50 px-3.5 text-xs font-bold text-purple-900 hover:bg-purple-100 transition shadow-2xs disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                            className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#FF4D3D]/40 bg-[#1c1414] px-3.5 text-xs font-bold text-[#FF4D3D] hover:bg-[#251818] transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                             title="Save this answer as Attempt 1 baseline and take a second attempt"
                           >
-                            <FlaskConical size={14} className="text-purple-700" />
-                            <span>Submit as Attempt 1 (A/B)</span>
+                            <FlaskConical size={14} />
+                            <span>Save Attempt 1</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => submitAnswer("question")}
                           disabled={stage !== "live" || !answer.trim()}
-                          className="flex h-11 items-center justify-center gap-2 rounded-md bg-zinc-950 px-5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm cursor-pointer"
+                          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-5 text-xs font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 shadow-md shadow-[#FF4D3D]/25 cursor-pointer active:scale-95"
                           title="Submit answer and advance to next question"
                         >
-                          <Send size={16} />
-                          <span>Submit Question</span>
+                          <Send size={14} />
+                          <span>Submit Answer</span>
                         </button>
                       </div>
                     )}
@@ -2952,14 +3000,14 @@ export default function InterviewSimulator() {
             </div>
           </section>
 
-          <aside className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
+          <aside className="flex flex-col gap-3 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5]">
             {/* Tab Navigation for Sidebar - Spacious 2x2 Grid */}
-            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-zinc-200/90 bg-zinc-100/90 p-1.5 shadow-2xs">
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-[#222222] bg-[#0c0c0c] p-1 shadow-inner">
               {[
-                { id: "scorecard", label: "Scorecard", icon: Gauge, badge: completedQuestions > 0 ? `${completedQuestions}` : null, tone: "text-emerald-600" },
-                { id: "memory", label: "Memory", icon: BrainCircuit, badge: sessionMemory.claims.length > 0 ? `${sessionMemory.claims.length}` : null, tone: "text-fuchsia-600" },
-                { id: "skills", label: "Skills", icon: Target, badge: activeSkillGapReport ? `${activeSkillGapReport.skills.length}` : null, tone: "text-indigo-600" },
-                { id: "integrity", label: "Integrity", icon: ShieldCheck, badge: `${integrityState.integrityScore}%`, tone: integrityState.integrityScore >= 85 ? "text-emerald-600" : "text-amber-600" },
+                { id: "scorecard", label: "Scorecard", icon: Gauge, badge: completedQuestions > 0 ? `${completedQuestions}` : null, tone: "text-[#FF4D3D]" },
+                { id: "memory", label: "Memory", icon: BrainCircuit, badge: sessionMemory.claims.length > 0 ? `${sessionMemory.claims.length}` : null, tone: "text-[#FF4D3D]" },
+                { id: "skills", label: "Skills", icon: Target, badge: activeSkillGapReport ? `${activeSkillGapReport.skills.length}` : null, tone: "text-[#FF4D3D]" },
+                { id: "integrity", label: "Integrity", icon: ShieldCheck, badge: `${integrityState.integrityScore}%`, tone: integrityState.integrityScore >= 85 ? "text-emerald-400" : "text-[#FF4D3D]" },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = sidebarTab === tab.id;
@@ -2970,20 +3018,20 @@ export default function InterviewSimulator() {
                     onClick={() => setSidebarTab(tab.id as typeof sidebarTab)}
                     className={`flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition cursor-pointer ${
                       isActive
-                        ? "bg-white text-zinc-950 shadow-xs border border-zinc-200/90 ring-1 ring-black/5"
-                        : "text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900"
+                        ? "bg-[#FF4D3D] text-white shadow-sm"
+                        : "text-[#A0A0A0] hover:text-[#F5F5F5] hover:bg-[#1a1a1a]"
                     }`}
                   >
                     <span className="flex items-center gap-1.5 truncate">
-                      <Icon size={14} className={isActive ? tab.tone : "text-zinc-400"} />
+                      <Icon size={14} className={isActive ? "text-white" : tab.tone} />
                       <span className="truncate">{tab.label}</span>
                     </span>
                     {tab.badge && (
                       <span
                         className={`shrink-0 rounded-full px-1.5 py-0.2 text-[9.5px] font-mono font-bold ${
                           isActive
-                            ? "bg-zinc-100 text-zinc-800 border border-zinc-200"
-                            : "bg-zinc-200/80 text-zinc-600"
+                            ? "bg-black/40 text-white border border-white/20"
+                            : "bg-[#222222] text-[#A0A0A0] border border-[#333333]"
                         }`}
                       >
                         {tab.badge}
@@ -2999,16 +3047,19 @@ export default function InterviewSimulator() {
               <>
                 <section>
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Scorecard</h2>
-                    <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
+                      Performance Scorecard
+                    </h2>
+                    <span className="rounded-md bg-[#1a1a1a] border border-[#262626] px-2 py-0.5 text-[11px] font-mono font-semibold text-[#A0A0A0]">
                       {completedQuestions} answers
                     </span>
                   </div>
-                  <div className="grid grid-cols-[116px_1fr] items-center gap-4">
-                    <div className="grid aspect-square place-items-center rounded-full border-[10px] border-emerald-600 bg-emerald-50">
+                  <div className="grid grid-cols-[108px_1fr] items-center gap-3.5 rounded-xl border border-[#222222] bg-[#0d0d0d] p-3">
+                    <div className="grid aspect-square place-items-center rounded-full border-[6px] border-[#FF4D3D]/30 bg-[#151515] shadow-[0_0_20px_rgba(255,77,61,0.15)]">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-zinc-950">{average || "--"}</div>
-                        <div className="text-xs font-semibold uppercase tracking-normal text-zinc-500">Avg</div>
+                        <div className="text-2xl font-bold font-mono text-[#F5F5F5]">{average || "--"}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-[#A0A0A0]">Average</div>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -3024,7 +3075,10 @@ export default function InterviewSimulator() {
                 </section>
 
                 <section>
-                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Signal Analysis</h2>
+                  <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
+                    Signal Telemetry
+                  </h2>
                   <div className="grid gap-2">
                     <SignalRow
                       label="Technical accuracy"
@@ -3218,10 +3272,13 @@ export default function InterviewSimulator() {
                 </section>
 
                 <section className="min-h-36">
-                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-normal text-zinc-500">Feedback</h2>
+                  <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
+                    Adaptive Feedback
+                  </h2>
                   <div className="flex flex-col gap-2">
                     {(latestTurn?.feedback ?? ["Start the interview to generate feedback."]).map((item) => (
-                      <div key={item} className="rounded-md border border-zinc-200 bg-[#fbfcfa] p-3 text-sm leading-6 text-zinc-700">
+                      <div key={item} className="rounded-lg border border-[#222222] bg-[#151515] p-3 text-xs leading-relaxed text-[#F5F5F5]">
                         {item}
                       </div>
                     ))}
@@ -3229,9 +3286,12 @@ export default function InterviewSimulator() {
                 </section>
 
                 <section>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Session Log</h2>
-                    <span className="text-[10px] text-zinc-400 font-mono">Click turn to inspect</span>
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
+                      Session Log
+                    </h2>
+                    <span className="text-[10px] text-[#A0A0A0] font-mono">Click turn to inspect</span>
                   </div>
                   <div className="max-h-52 space-y-2 overflow-auto pr-1">
                     {history.length ? (
@@ -3239,34 +3299,34 @@ export default function InterviewSimulator() {
                         <article
                           key={turn.id}
                           onClick={() => setSelectedTurnId(turn.id)}
-                          className={`cursor-pointer rounded-md border p-3 bg-white transition hover:border-emerald-400 hover:shadow-xs ${
-                            selectedTurnId === turn.id ? "ring-2 ring-emerald-500 border-emerald-500" : "border-zinc-200"
+                          className={`cursor-pointer rounded-lg border p-3 bg-[#151515] transition hover:border-[#FF4D3D]/50 hover:shadow-xs ${
+                            selectedTurnId === turn.id ? "ring-1 ring-[#FF4D3D] border-[#FF4D3D]" : "border-[#222222]"
                           }`}
                         >
-                          <div className="mb-1 flex items-center justify-between text-xs font-semibold text-zinc-500">
+                          <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#A0A0A0]">
                             <span>Question {turn.id}</span>
                             <div className="flex items-center gap-1.5">
                               {turn.weakArea ? (
-                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
+                                <span className="rounded bg-[#2a1705] border border-amber-800/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
                                   Probed Gap
                                 </span>
                               ) : (
-                                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-900">
+                                <span className="rounded bg-[#0f241a] border border-emerald-800/40 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
                                   High Depth
                                 </span>
                               )}
-                              <span className="font-bold text-zinc-900">{turn.score}/100</span>
+                              <span className="font-mono font-bold text-[#F5F5F5]">{turn.score}/100</span>
                             </div>
                           </div>
-                          <p className="line-clamp-2 text-sm leading-6 text-zinc-800">{turn.question}</p>
+                          <p className="line-clamp-2 text-xs leading-relaxed text-[#A0A0A0]">{turn.question}</p>
                           {turn.weakArea && (
-                            <div className="mt-1 text-[11px] text-amber-800 font-medium">
+                            <div className="mt-1 text-[11px] text-amber-400 font-medium">
                               Gap: {turn.weakArea}
                             </div>
                           )}
                           {turn.structureAnalysis && (
                             <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                              <span className="text-[10px] font-semibold text-zinc-500 font-mono">
+                              <span className="text-[10px] font-semibold text-[#A0A0A0] font-mono">
                                 {turn.structureAnalysis.framework === "STAR" ? "STAR" : "5-Point"}:
                               </span>
                               {turn.structureAnalysis.elements.map((el) => (
@@ -3274,8 +3334,8 @@ export default function InterviewSimulator() {
                                   key={el.name}
                                   className={`rounded px-1.5 py-0.2 text-[10px] font-semibold ${
                                     el.detected
-                                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                      : "bg-rose-50 text-rose-800 border border-rose-200"
+                                      ? "bg-[#0f241a] text-emerald-400 border border-emerald-800/40"
+                                      : "bg-[#281113] text-[#FF4D3D] border border-[#FF4D3D]/30"
                                   }`}
                                 >
                                   {el.name} {el.detected ? "✓" : "✗"}
@@ -3286,7 +3346,7 @@ export default function InterviewSimulator() {
                         </article>
                       ))
                     ) : (
-                      <div className="rounded-md border border-dashed border-zinc-300 p-4 text-sm text-zinc-500">No answers yet.</div>
+                      <div className="rounded-lg border border-dashed border-[#222222] bg-[#0c0c0c] p-4 text-xs text-center text-[#A0A0A0]">No answers yet.</div>
                     )}
                   </div>
                 </section>
@@ -3297,19 +3357,22 @@ export default function InterviewSimulator() {
             {sidebarTab === "memory" && (
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold uppercase tracking-normal text-zinc-500">Interviewer Memory</h2>
-                  <span className="rounded bg-fuchsia-100 px-2 py-0.5 text-[10px] font-bold text-fuchsia-900 font-mono">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
+                    Interviewer Memory
+                  </h2>
+                  <span className="rounded bg-[#281113] border border-[#FF4D3D]/30 px-2 py-0.5 text-[10px] font-bold text-[#FF4D3D] font-mono">
                     {sessionMemory.claims.length} claims
                   </span>
                 </div>
-                <div className="flex flex-col gap-2.5 rounded-md border border-zinc-200 bg-zinc-50/70 p-3.5 text-xs">
+                <div className="flex flex-col gap-2.5 rounded-xl border border-[#222222] bg-[#0c0c0c] p-3.5 text-xs">
                   {sessionMemory.claims.length > 0 ? (
                     <>
                       <div>
-                        <span className="font-bold text-zinc-800 text-[11px]">📌 Candidate Claims:</span>
+                        <span className="font-bold text-[#F5F5F5] text-[11px]">📌 Candidate Claims:</span>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {sessionMemory.claims.map((c) => (
-                            <span key={c} className="rounded bg-white px-2 py-1 text-[11px] font-semibold text-zinc-900 border border-zinc-200 shadow-2xs">
+                            <span key={c} className="rounded-md bg-[#151515] px-2 py-1 text-[11px] font-semibold text-[#F5F5F5] border border-[#262626]">
                               {c}
                             </span>
                           ))}
@@ -3317,10 +3380,10 @@ export default function InterviewSimulator() {
                       </div>
                       {sessionMemory.skills_demonstrated.length > 0 && (
                         <div className="mt-1.5">
-                          <span className="font-bold text-emerald-800 text-[11px]">🌟 Demonstrated Skills:</span>
+                          <span className="font-bold text-emerald-400 text-[11px]">🌟 Demonstrated Skills:</span>
                           <div className="mt-1 flex flex-wrap gap-1">
                             {sessionMemory.skills_demonstrated.map((s) => (
-                              <span key={s} className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-900 border border-emerald-200">
+                              <span key={s} className="rounded-md bg-[#0f241a] px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-800/40">
                                 {s}
                               </span>
                             ))}
@@ -3329,35 +3392,35 @@ export default function InterviewSimulator() {
                       )}
                       {sessionMemory.followups_pending.length > 0 && (
                         <div className="mt-1.5">
-                          <span className="font-bold text-amber-800 text-[11px]">🎯 Pending Claim Verification:</span>
-                          <div className="mt-1 rounded bg-amber-50/80 p-2 text-[11px] text-amber-900 border border-amber-200 italic">
+                          <span className="font-bold text-amber-400 text-[11px]">🎯 Pending Claim Verification:</span>
+                          <div className="mt-1 rounded-md bg-[#221708] p-2 text-[11px] text-amber-300 border border-amber-800/40 italic">
                             &quot;{sessionMemory.followups_pending[0]}&quot;
                           </div>
                         </div>
                       )}
                       {sessionMemory.conflicts && sessionMemory.conflicts.length > 0 && (
-                        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50/90 p-2.5 text-xs text-amber-950 shadow-2xs">
-                          <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                            <AlertTriangle className="size-3.5 text-amber-600" />
+                        <div className="mt-2 rounded-lg border border-[#FF4D3D]/40 bg-[#281113] p-2.5 text-xs text-[#F5F5F5]">
+                          <div className="flex items-center gap-1.5 font-bold text-[#FF4D3D]">
+                            <AlertTriangle className="size-3.5 text-[#FF4D3D]" />
                             <span>Claim Inconsistency Analysis</span>
                           </div>
                           {sessionMemory.conflicts.map((c, idx) => (
-                            <div key={idx} className="mt-1.5 border-t border-amber-200/60 pt-1.5 text-[11px] leading-relaxed">
-                              <div className="font-semibold text-amber-900">{c.topic}</div>
-                              <div className="text-zinc-700">
-                                • Earlier (Turn {c.earlier_turn}): <span className="font-mono font-semibold text-zinc-900">{c.earlier_claim}</span>
+                            <div key={idx} className="mt-1.5 border-t border-[#FF4D3D]/20 pt-1.5 text-[11px] leading-relaxed">
+                              <div className="font-semibold text-[#FF4D3D]">{c.topic}</div>
+                              <div className="text-[#A0A0A0]">
+                                • Earlier (Turn {c.earlier_turn}): <span className="font-mono font-semibold text-[#F5F5F5]">{c.earlier_claim}</span>
                               </div>
-                              <div className="text-zinc-700">
-                                • Later (Turn {c.later_turn}): <span className="font-mono font-semibold text-rose-700">{c.later_claim}</span>
+                              <div className="text-[#A0A0A0]">
+                                • Later (Turn {c.later_turn}): <span className="font-mono font-semibold text-[#FF4D3D]">{c.later_claim}</span>
                               </div>
-                              <div className="mt-1 text-zinc-600 italic">{c.explanation}</div>
+                              <div className="mt-1 text-[#A0A0A0] italic">{c.explanation}</div>
                             </div>
                           ))}
                         </div>
                       )}
                     </>
                   ) : (
-                    <div className="text-zinc-500 text-center py-6 text-xs leading-relaxed">
+                    <div className="text-[#A0A0A0] text-center py-6 text-xs leading-relaxed">
                       No claims recorded yet. The interviewer extracts and recalls specific metrics, frameworks, and achievements as you answer questions.
                     </div>
                   )}
@@ -3388,59 +3451,59 @@ export default function InterviewSimulator() {
             {/* TAB 4: INTEGRITY MONITOR */}
             {sidebarTab === "integrity" && (
               <section className="space-y-3">
-                <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-2xs">
-                  <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-3">
+                <div className="rounded-xl border border-[#222222] bg-[#151515] p-4 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-[#222222] pb-3 mb-3">
                     <div className="flex items-center gap-2">
                       <div className={`grid size-9 place-items-center rounded-lg ${
                         integrityState.integrityScore >= 85
-                          ? "bg-emerald-100 text-emerald-800"
+                          ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40"
                           : integrityState.integrityScore >= 65
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-rose-100 text-rose-800"
+                          ? "bg-amber-950/60 text-amber-400 border border-amber-800/40"
+                          : "bg-[#281113] text-[#FF4D3D] border border-[#FF4D3D]/30"
                       }`}>
                         <ShieldCheck size={20} />
                       </div>
                       <div>
-                        <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wide">
+                        <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wide">
                           Integrity & Focus Telemetry
                         </h3>
-                        <p className="text-[11px] text-zinc-500 font-mono">
-                          Status: <strong className={integrityState.integrityScore >= 85 ? "text-emerald-700" : "text-amber-700"}>{integrityState.integrityLevel}</strong>
+                        <p className="text-[11px] text-[#A0A0A0] font-mono">
+                          Status: <strong className={integrityState.integrityScore >= 85 ? "text-emerald-400" : "text-[#FF4D3D]"}>{integrityState.integrityLevel}</strong>
                         </p>
                       </div>
                     </div>
                     <div className="text-right font-mono">
-                      <span className="text-xl font-bold text-zinc-900">{integrityState.integrityScore}</span>
-                      <span className="text-xs text-zinc-400">/100</span>
+                      <span className="text-xl font-bold text-[#F5F5F5]">{integrityState.integrityScore}</span>
+                      <span className="text-xs text-[#A0A0A0]">/100</span>
                     </div>
                   </div>
 
                   {/* Diagnostic Checklist */}
                   <div className="space-y-2 mb-3">
-                    <div className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider">
+                    <div className="text-[11px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                       Live Environmental Diagnostics
                     </div>
                     <div className="space-y-1.5 font-mono text-xs">
                       {integrityState.diagnosticChecks.map((chk) => (
                         <div
                           key={chk.id}
-                          className="flex items-start justify-between gap-2 rounded-md bg-zinc-50 p-2 border border-zinc-100"
+                          className="flex items-start justify-between gap-2 rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]"
                         >
                           <div className="flex items-start gap-2">
-                            <span className={`font-bold ${chk.status === "pass" ? "text-emerald-600" : chk.status === "warn" ? "text-amber-600" : "text-rose-600"}`}>
+                            <span className={`font-bold ${chk.status === "pass" ? "text-emerald-400" : chk.status === "warn" ? "text-amber-400" : "text-[#FF4D3D]"}`}>
                               {chk.symbol}
                             </span>
                             <div>
-                              <div className="font-semibold text-zinc-900 text-[11px]">{chk.label}</div>
-                              <div className="text-[10px] text-zinc-500 font-sans leading-tight mt-0.5">{chk.detail}</div>
+                              <div className="font-semibold text-[#F5F5F5] text-[11px]">{chk.label}</div>
+                              <div className="text-[10px] text-[#A0A0A0] font-sans leading-tight mt-0.5">{chk.detail}</div>
                             </div>
                           </div>
-                          <span className={`shrink-0 text-[10px] uppercase font-bold px-1.5 py-0.2 rounded ${
+                          <span className={`shrink-0 text-[10px] uppercase font-bold px-1.5 py-0.2 rounded border ${
                             chk.status === "pass"
-                              ? "bg-emerald-100 text-emerald-800"
+                              ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/40"
                               : chk.status === "warn"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-rose-100 text-rose-800"
+                              ? "bg-amber-950/60 text-amber-400 border-amber-800/40"
+                              : "bg-[#281113] text-[#FF4D3D] border-[#FF4D3D]/30"
                           }`}>
                             {chk.status}
                           </span>
@@ -3451,34 +3514,34 @@ export default function InterviewSimulator() {
 
                   {/* Multi-Vector Telemetry Matrix */}
                   <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono mb-3">
-                    <div className="rounded bg-zinc-50 p-2 border border-zinc-200">
-                      <div className="text-[10px] text-zinc-500">Faces in Frame</div>
-                      <div className="text-sm font-bold text-zinc-800">{integrityState.facesCount} detected</div>
+                    <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                      <div className="text-[10px] text-[#A0A0A0]">Faces in Frame</div>
+                      <div className="text-sm font-bold text-[#F5F5F5]">{integrityState.facesCount} detected</div>
                     </div>
-                    <div className="rounded bg-zinc-50 p-2 border border-zinc-200">
-                      <div className="text-[10px] text-zinc-500">Window Blur / Switch</div>
-                      <div className="text-sm font-bold text-zinc-800">{integrityState.tabSwitchCount} times ({integrityState.totalTabSwitchDurationSec}s)</div>
+                    <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                      <div className="text-[10px] text-[#A0A0A0]">Window Blur / Switch</div>
+                      <div className="text-sm font-bold text-[#F5F5F5]">{integrityState.tabSwitchCount} times ({integrityState.totalTabSwitchDurationSec}s)</div>
                     </div>
-                    <div className="rounded bg-zinc-50 p-2 border border-zinc-200">
-                      <div className="text-[10px] text-zinc-500">Clipboard Pastes</div>
-                      <div className="text-sm font-bold text-zinc-800">{integrityState.clipboardEventsCount} ops ({integrityState.pastedCharactersTotal} ch)</div>
+                    <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                      <div className="text-[10px] text-[#A0A0A0]">Clipboard Pastes</div>
+                      <div className="text-sm font-bold text-[#F5F5F5]">{integrityState.clipboardEventsCount} ops ({integrityState.pastedCharactersTotal} ch)</div>
                     </div>
-                    <div className="rounded bg-zinc-50 p-2 border border-zinc-200">
-                      <div className="text-[10px] text-zinc-500">Off-Screen Gaze</div>
-                      <div className="text-sm font-bold text-zinc-800">{integrityState.gazeAwayCount} bursts ({integrityState.gazeAwayPercent}%)</div>
+                    <div className="rounded-lg bg-[#0c0c0c] p-2 border border-[#222222]">
+                      <div className="text-[10px] text-[#A0A0A0]">Off-Screen Gaze</div>
+                      <div className="text-sm font-bold text-[#F5F5F5]">{integrityState.gazeAwayCount} bursts ({integrityState.gazeAwayPercent}%)</div>
                     </div>
                   </div>
 
                   {/* Constructive Objective Disclaimer */}
-                  <div className="rounded-md border border-zinc-200 bg-zinc-50/80 p-2.5 text-[11px] text-zinc-600 leading-relaxed italic mb-3">
-                    <span className="font-semibold text-zinc-800 not-italic">Integrity Notice: </span>
+                  <div className="rounded-lg border border-[#222222] bg-[#0c0c0c] p-2.5 text-[11px] text-[#A0A0A0] leading-relaxed italic mb-3">
+                    <span className="font-semibold text-[#F5F5F5] not-italic">Integrity Notice: </span>
                     Looking away while thinking, referencing secondary screens, or natural typing pauses are expected human behaviors and do not constitute proof of cheating.
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setShowIntegrityModal(true)}
-                    className="w-full flex items-center justify-center gap-2 rounded-md bg-zinc-900 py-2 text-xs font-bold text-white hover:bg-zinc-800 transition cursor-pointer shadow-xs"
+                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#111111] border border-[#262626] py-2 text-xs font-bold text-[#F5F5F5] hover:bg-[#FF4D3D] hover:text-white hover:border-[#FF4D3D] transition cursor-pointer shadow-sm"
                   >
                     <ShieldCheck size={14} />
                     <span>Open Full Integrity Audit Log</span>
@@ -3488,7 +3551,10 @@ export default function InterviewSimulator() {
             )}
           </aside>
         </div>
+      )}
       </div>
+
+
 
       {selectedTurn && (
         <TurnInspectorModal
@@ -3578,14 +3644,32 @@ export default function InterviewSimulator() {
           onClose={() => setShowBenchmarkModal(false)}
         />
       )}
+
+      {/* Feature #17: Confirmation Modal */}
+      {showResetConfirmModal && (
+        <ConfirmationModal
+          isOpen={showResetConfirmModal}
+          title="Reset Interview Session?"
+          description="Are you sure you want to start a new session? Your current responses, audio telemetry, and evaluation scores for this run will be reset."
+          confirmLabel="Reset Session"
+          cancelLabel="Keep Practicing"
+          variant="danger"
+          onConfirm={() => {
+            resetSession();
+            setShowResetConfirmModal(false);
+          }}
+          onCancel={() => setShowResetConfirmModal(false)}
+        />
+      )}
     </main>
+
   );
 }
 
 function StatusPill({ icon: Icon, label }: { icon: typeof Users; label: string }) {
   return (
-    <div className="flex h-10 min-w-0 items-center gap-2 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur">
-      <Icon size={16} className="shrink-0 text-fuchsia-300" />
+    <div className="flex h-10 min-w-0 items-center gap-2 rounded-xl border border-[#262626] bg-[#151515] px-3 text-xs font-semibold text-[#F5F5F5] shadow-sm backdrop-blur">
+      <Icon size={15} className="shrink-0 text-[#FF4D3D]" />
       <span className="truncate">{label}</span>
     </div>
   );
@@ -3605,16 +3689,16 @@ function ThemeToggle({
     <button
       type="button"
       onClick={() => onThemeChange(nextTheme)}
-      className="flex h-12 min-w-36 items-center justify-between gap-3 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60"
+      className="flex h-10 min-w-36 items-center justify-between gap-3 rounded-xl border border-[#262626] bg-[#151515] px-3 text-left text-[#F5F5F5] shadow-sm backdrop-blur transition hover:border-[#FF4D3D]/50 cursor-pointer"
       aria-label={`Switch panels to ${nextTheme} theme`}
       title={`Switch panels to ${nextTheme} theme`}
     >
-      <span className="flex items-center gap-2 text-sm font-semibold">
-        <Icon size={16} className="text-fuchsia-300" />
-        {theme === "light" ? "Light" : "Dark"}
+      <span className="flex items-center gap-2 text-xs font-semibold">
+        <Icon size={15} className="text-[#FF4D3D]" />
+        {theme === "light" ? "Light Mode" : "Dark Mode"}
       </span>
-      <span className="rounded-md bg-fuchsia-400/14 px-2 py-1 text-xs font-bold uppercase tracking-normal text-fuchsia-100">
-        Theme
+      <span className="rounded-md bg-[#FF4D3D]/10 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-normal text-[#FF4D3D] border border-[#FF4D3D]/25">
+        UI
       </span>
     </button>
   );
@@ -3635,8 +3719,8 @@ function TimeWeatherPanel() {
     weather.status === "loading"
       ? "Loading"
       : weather.status === "ready" && weather.temperature !== null
-        ? `${Math.round(weather.temperature)} C`
-        : "-- C";
+        ? `${Math.round(weather.temperature)}°C`
+        : "--°C";
 
   useEffect(() => {
     const preferenceTimer = window.setTimeout(() => {
@@ -3745,22 +3829,22 @@ function TimeWeatherPanel() {
   }, []);
 
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-3 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 py-2 text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur">
-      <div className="flex items-center gap-2 pr-1">
-        <Clock3 size={16} className="text-fuchsia-300" />
+    <div className="flex min-h-10 flex-wrap items-center gap-3 rounded-xl border border-[#262626] bg-[#151515] px-3 py-1.5 text-[#F5F5F5] shadow-sm backdrop-blur">
+      <div className="flex items-center gap-2 pr-1 font-mono">
+        <Clock3 size={15} className="text-[#FF4D3D]" />
         <div>
-          <div className="text-sm font-bold leading-4">{time}</div>
-          <div className="text-[11px] font-medium leading-4 text-fuchsia-100/72">{date}</div>
+          <div className="text-xs font-bold leading-4">{time}</div>
+          <div className="text-[10px] text-[#A0A0A0]">{date}</div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1 rounded-md bg-black/22 p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-[#0c0c0c] p-0.5 font-mono">
         {(["12", "24"] as TimeMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
             onClick={() => setTimeMode(mode)}
-            className={`h-7 rounded-md px-2 text-xs font-bold transition ${
-              timeMode === mode ? "bg-fuchsia-400 text-white" : "text-fuchsia-100/78 hover:bg-white/10"
+            className={`h-6 rounded px-1.5 text-[11px] font-bold transition cursor-pointer ${
+              timeMode === mode ? "bg-[#FF4D3D] text-white" : "text-[#A0A0A0] hover:text-white"
             }`}
             aria-label={`Use ${mode}-hour time`}
           >
@@ -3768,11 +3852,11 @@ function TimeWeatherPanel() {
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2 border-l border-fuchsia-400/20 pl-3">
-        <Thermometer size={16} className="text-fuchsia-300" />
+      <div className="flex items-center gap-2 border-l border-[#262626] pl-3 font-mono">
+        <Thermometer size={15} className="text-[#FF4D3D]" />
         <div>
-          <div className="text-sm font-bold leading-4">{temperature}</div>
-          <div className="text-[11px] font-medium leading-4 text-fuchsia-100/72">{weather.label}</div>
+          <div className="text-xs font-bold leading-4">{temperature}</div>
+          <div className="text-[10px] text-[#A0A0A0]">{weather.label}</div>
         </div>
       </div>
     </div>
@@ -3810,21 +3894,21 @@ function CameraSignal({
   sublabel?: string;
 }) {
   return (
-    <div className="rounded-md bg-white/92 px-3 py-2 text-zinc-950 shadow-sm backdrop-blur">
-      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-zinc-600">
+    <div className="rounded-xl border border-[#262626] bg-[#151515] px-3 py-2 text-[#F5F5F5] shadow-sm backdrop-blur">
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[#A0A0A0]">
         <span>{label}</span>
-        <span className="font-mono font-bold text-zinc-900">
+        <span className="font-mono font-bold text-[#F5F5F5]">
           {active ? (displayValue ?? `${Math.round(value)}%`) : "--"}
         </span>
       </div>
-      <div className="mt-2 h-1.5 rounded-full bg-zinc-200">
+      <div className="mt-2 h-1.5 rounded-full bg-[#222222]">
         <div
-          className="h-full rounded-full bg-emerald-600 transition-all"
+          className="h-full rounded-full bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] transition-all"
           style={{ width: `${active ? Math.min(100, Math.max(0, value)) : 0}%` }}
         />
       </div>
       {active && sublabel ? (
-        <div className="mt-1 text-[10px] font-semibold text-emerald-700 text-right">{sublabel}</div>
+        <div className="mt-1 text-[10px] font-semibold text-[#FF4D3D] text-right font-mono">{sublabel}</div>
       ) : null}
     </div>
   );
@@ -3842,19 +3926,19 @@ function MetricBar({
   hasEvaluated?: boolean;
 }) {
   const colors = {
-    emerald: "bg-emerald-600",
+    emerald: "bg-[#FF4D3D]",
     amber: "bg-amber-500",
     rose: "bg-rose-500",
-    zinc: "bg-zinc-700",
+    zinc: "bg-zinc-600",
   };
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs font-semibold text-zinc-600">
+      <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#A0A0A0]">
         <span>{label}</span>
-        <span className="font-mono font-bold text-zinc-800">{hasEvaluated && value > 0 ? `${value}` : "--"}</span>
+        <span className="font-mono font-bold text-[#F5F5F5]">{hasEvaluated && value > 0 ? `${value}` : "--"}</span>
       </div>
-      <div className="h-2 rounded-full bg-zinc-100">
+      <div className="h-2 rounded-full bg-[#222222]">
         <div
           className={`h-full rounded-full ${colors[tone]} transition-all`}
           style={{ width: `${hasEvaluated ? Math.min(100, Math.max(0, value)) : 0}%` }}
@@ -3876,14 +3960,14 @@ function SignalRow({
   detail?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-md bg-zinc-50 px-3 py-2">
+    <div className="flex flex-col gap-0.5 rounded-xl border border-[#222222] bg-[#141414] px-3 py-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-700">{label}</span>
-        <span className="text-sm font-bold text-zinc-950 font-mono">
+        <span className="text-xs font-medium text-[#A0A0A0]">{label}</span>
+        <span className="text-xs font-bold text-[#F5F5F5] font-mono">
           {displayValue !== undefined ? displayValue : value ? `${Math.round(value)}%` : "--"}
         </span>
       </div>
-      {detail ? <span className="text-[11px] text-zinc-500 font-mono">{detail}</span> : null}
+      {detail ? <span className="text-[10px] text-[#777777] font-mono">{detail}</span> : null}
     </div>
   );
 }
@@ -3901,27 +3985,27 @@ function EdgeModeToggle({
     <button
       type="button"
       onClick={() => onModeChange(isEdge ? "cloud" : "edge")}
-      className="flex h-12 min-w-40 items-center justify-between gap-3 rounded-md border border-fuchsia-400/25 bg-[#241044]/86 px-3 text-left text-white shadow-[0_0_24px_rgba(236,72,153,0.16)] backdrop-blur transition hover:border-fuchsia-300/60"
+      className="flex h-10 min-w-40 items-center justify-between gap-3 rounded-xl border border-[#262626] bg-[#151515] px-3 text-left text-white shadow-sm backdrop-blur transition hover:border-[#FF4D3D]/50 cursor-pointer"
       title={`Switch to ${isEdge ? "Cloud Mode" : "Edge AI Mode"}`}
     >
       <div className="flex items-center gap-2">
         {isEdge ? (
-          <Zap size={16} className="text-amber-400 animate-pulse" />
+          <Zap size={15} className="text-[#FF4D3D] animate-pulse" />
         ) : (
-          <Wifi size={16} className="text-sky-300" />
+          <Wifi size={15} className="text-[#A0A0A0]" />
         )}
         <div className="flex flex-col">
-          <span className="text-xs font-bold leading-tight text-white flex items-center gap-1">
+          <span className="text-xs font-bold leading-tight text-[#F5F5F5] flex items-center gap-1">
             {isEdge ? "Edge AI Mode" : "Cloud Mode"}
           </span>
-          <span className="text-[10px] text-fuchsia-200/80">
-            {isEdge ? "Air-Gapped Laptop" : "Remote Server"}
+          <span className="text-[10px] text-[#A0A0A0] font-mono">
+            {isEdge ? "Air-Gapped Local" : "Remote API"}
           </span>
         </div>
       </div>
       <span
         className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider font-mono ${
-          isEdge ? "bg-emerald-400/20 text-emerald-300" : "bg-sky-400/20 text-sky-200"
+          isEdge ? "bg-[#FF4D3D]/15 text-[#FF4D3D] border border-[#FF4D3D]/30" : "bg-white/10 text-[#A0A0A0]"
         }`}
       >
         {isEdge ? "0ms" : "API"}

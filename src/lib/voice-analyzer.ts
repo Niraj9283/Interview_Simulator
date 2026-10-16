@@ -127,6 +127,8 @@ export class VoiceAnalyzer {
 
   // Real-time smoothing
   private smoothedEnergy = 0;
+  private lastCallbackTime = 0;
+  private lastSpeakingState = false;
 
   public start(stream: MediaStream, onUpdate: VoiceUpdateCallback) {
     this.stop();
@@ -254,15 +256,21 @@ export class VoiceAnalyzer {
         }
       }
 
-      onUpdate({
-        energy: displayEnergy,
-        db: Number(db.toFixed(1)),
-        rms: Number(rms.toFixed(4)),
-        pitchHz: detectedPitch,
-        isSpeaking,
-        pace,
-        steadiness,
-      });
+      const now = performance.now();
+      const speakingChanged = isSpeaking !== this.lastSpeakingState;
+      if (speakingChanged || now - this.lastCallbackTime >= 90) {
+        this.lastCallbackTime = now;
+        this.lastSpeakingState = isSpeaking;
+        onUpdate({
+          energy: displayEnergy,
+          db: Number(db.toFixed(1)),
+          rms: Number(rms.toFixed(4)),
+          pitchHz: detectedPitch,
+          isSpeaking,
+          pace,
+          steadiness,
+        });
+      }
 
       this.animFrameId = window.requestAnimationFrame(tick);
     };

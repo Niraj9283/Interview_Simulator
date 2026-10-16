@@ -1,28 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #160728;
-  --foreground: #f8f7ff;
+  --background: #080808;
+  --surface-secondary: #111111;
+  --surface-card: #151515;
+  --foreground: #F5F5F5;
+  --text-muted: #A0A0A0;
+  --accent-primary: #FF4D3D;
+  --accent-secondary: #D9362B;
+  --border-subtle: #222222;
+  --border-medium: #2A2A2A;
+  --border-highlight: rgba(255, 77, 61, 0.35);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-card: var(--surface-card);
+  --color-accent: var(--accent-primary);
+  --color-accent-muted: var(--accent-secondary);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  background-color: #080808;
+  color-scheme: dark;
+}
+
 body {
-  background: radial-gradient(circle at 20% 55%, rgba(194, 24, 127, 0.18), transparent 38%),
-    radial-gradient(circle at 78% 18%, rgba(92, 39, 137, 0.2), transparent 35%),
-    linear-gradient(135deg, #1b0734 0%, #241044 48%, var(--background) 100%);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #080808;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(255, 77, 61, 0.06), transparent 35%),
+    radial-gradient(circle at 85% 80%, rgba(217, 54, 43, 0.05), transparent 30%),
+    linear-gradient(180deg, #080808 0%, #0d0d0d 50%, #080808 100%);
+  color: #F5F5F5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   isolation: isolate;
+  min-height: 100vh;
+}
+
+/* Subtle cinematic background grid */
+.bg-tech-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
 }
 
 .interactive-bg {
@@ -32,8 +60,10 @@ body {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
-  filter: saturate(1.18) contrast(1.05);
   opacity: 1;
+  transform: translateZ(0);
+  will-change: transform;
+  contain: strict;
 }
 
 body > main {
@@ -41,59 +71,74 @@ body > main {
   z-index: 1;
 }
 
-.interview-shell[data-panel-theme="dark"] .bg-white,
-.interview-shell[data-panel-theme="dark"] .bg-white\/92,
-.interview-shell[data-panel-theme="dark"] .bg-zinc-50,
-.interview-shell[data-panel-theme="dark"] .bg-zinc-100,
-.interview-shell[data-panel-theme="dark"] .bg-\[\#fbfcfa\] {
-  background-color: rgba(25, 10, 46, 0.92) !important;
+/* Red-orange glowing accents & states */
+.accent-glow {
+  box-shadow: 0 0 25px rgba(255, 77, 61, 0.25);
 }
 
-.interview-shell[data-panel-theme="dark"] .border-zinc-200,
-.interview-shell[data-panel-theme="dark"] .border-zinc-300 {
-  border-color: rgba(217, 70, 239, 0.28) !important;
+.accent-glow-sm {
+  box-shadow: 0 0 14px rgba(255, 77, 61, 0.18);
 }
 
-.interview-shell[data-panel-theme="dark"] .border-dashed {
-  border-color: rgba(244, 114, 182, 0.34) !important;
+.accent-border-glow:hover {
+  border-color: rgba(255, 77, 61, 0.5) !important;
+  box-shadow: 0 0 20px rgba(255, 77, 61, 0.2) !important;
 }
 
-.interview-shell[data-panel-theme="dark"] input:not([type="file"]),
-.interview-shell[data-panel-theme="dark"] select,
-.interview-shell[data-panel-theme="dark"] textarea {
-  background-color: rgba(17, 6, 34, 0.88) !important;
-  border-color: rgba(217, 70, 239, 0.3) !important;
-  color: #fbf7ff !important;
+/* Dark mode panel theme overrides */
+.interview-shell .bg-white,
+.interview-shell .bg-white\/92,
+.interview-shell .bg-zinc-50,
+.interview-shell .bg-zinc-100,
+.interview-shell .bg-\[\#fbfcfa\] {
+  background-color: #151515 !important;
 }
 
-.interview-shell[data-panel-theme="dark"] input::placeholder,
-.interview-shell[data-panel-theme="dark"] textarea::placeholder {
-  color: rgba(250, 232, 255, 0.52) !important;
+.interview-shell .border-zinc-200,
+.interview-shell .border-zinc-300 {
+  border-color: #222222 !important;
 }
 
-.interview-shell[data-panel-theme="dark"] select option {
-  background-color: #190a2e;
-  color: #fbf7ff;
+.interview-shell .border-dashed {
+  border-color: #2A2A2A !important;
 }
 
-.interview-shell[data-panel-theme="dark"] .text-zinc-950,
-.interview-shell[data-panel-theme="dark"] .text-zinc-900,
-.interview-shell[data-panel-theme="dark"] .text-zinc-800,
-.interview-shell[data-panel-theme="dark"] .text-zinc-700 {
-  color: #fbf7ff !important;
+.interview-shell input:not([type="file"]),
+.interview-shell select,
+.interview-shell textarea {
+  background-color: #111111 !important;
+  border-color: #2A2A2A !important;
+  color: #F5F5F5 !important;
 }
 
-.interview-shell[data-panel-theme="dark"] .text-zinc-600,
-.interview-shell[data-panel-theme="dark"] .text-zinc-500 {
-  color: rgba(250, 232, 255, 0.72) !important;
+.interview-shell input::placeholder,
+.interview-shell textarea::placeholder {
+  color: #666666 !important;
 }
 
-.interview-shell[data-panel-theme="dark"] .bg-zinc-200 {
-  background-color: rgba(113, 63, 140, 0.55) !important;
+.interview-shell select option {
+  background-color: #111111;
+  color: #F5F5F5;
 }
 
-.interview-shell[data-panel-theme="dark"] .shadow-sm {
-  box-shadow: 0 0 26px rgba(236, 72, 153, 0.12) !important;
+.interview-shell .text-zinc-950,
+.interview-shell .text-zinc-900,
+.interview-shell .text-zinc-800,
+.interview-shell .text-zinc-700 {
+  color: #F5F5F5 !important;
+}
+
+.interview-shell .text-zinc-600,
+.interview-shell .text-zinc-500 {
+  color: #A0A0A0 !important;
+}
+
+.interview-shell .bg-zinc-200 {
+  background-color: #222222 !important;
+}
+
+.interview-shell .shadow-sm {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
 }
 
 button,
@@ -103,11 +148,121 @@ select {
   font: inherit;
 }
 
-
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid #047857;
+  outline: 2px solid #FF4D3D;
   outline-offset: 2px;
+}
+
+/* Micro-interactions */
+.hover-elevate {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hover-elevate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+}
+
+.hover-glow {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.hover-glow:hover {
+  border-color: rgba(255, 77, 61, 0.5) !important;
+  box-shadow: 0 0 20px rgba(255, 77, 61, 0.25) !important;
+}
+
+/* Custom technical scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF4D3D;
+}
+
+/* Form error shake animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Dedicated Print Style Sheet */
+@media print {
+  .interactive-bg,
+  .print\:hidden,
+  header,
+  footer,
+  button:not(.print\:show),
+  input,
+  textarea,
+  select,
+  [role="dialog"],
+  [role="region"],
+  [role="progressbar"],
+  canvas,
+  video {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+
+  body > main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .interview-shell,
+  .interview-shell * {
+    background-color: transparent !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #e5e7eb !important;
+  }
+
+  h1, h2, h3, h4 {
+    color: #0f172a !important;
+    page-break-after: avoid;
+  }
+
+  .rounded-xl,
+  .rounded-2xl,
+  article,
+  section {
+    page-break-inside: avoid;
+    border: 1px solid #d1d5db !important;
+    margin-bottom: 12pt !important;
+    padding: 12pt !important;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #6b7280;
+  }
 }

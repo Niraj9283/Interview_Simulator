@@ -4,9 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      NODE_ENV: production
       NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - backend
 
@@ -15,10 +16,14 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      DATABASE_URL: postgresql://mockmate:mockmate@postgres:5432/mockmate
-      CHROMA_URL: http://chroma:8000
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      SECRET_KEY: ${SECRET_KEY:-mockmate_secret_key_change_me_in_prod}
+      JWT_SECRET: ${JWT_SECRET:-mockmate_jwt_secret_change_me_in_prod}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-mockmate_admin_key_change_me_in_prod}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       - postgres
       - chroma
@@ -26,18 +31,20 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: mockmate
-      POSTGRES_USER: mockmate
-      POSTGRES_PASSWORD: mockmate
+      POSTGRES_DB: ${POSTGRES_DB:-mockmate}
+      POSTGRES_USER: ${POSTGRES_USER:-mockmate_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mockmate_strong_pass_replace_me}
+    # Bound to localhost only to prevent unauthorized external access
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
   chroma:
     image: chromadb/chroma:latest
+    # Bound to localhost only to protect vector data
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
       - chroma-data:/chroma/chroma
 

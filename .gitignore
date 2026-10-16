@@ -1,6 +1,8 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ==============================================================================
+# Git Ignore Rules - Production Hardened
+# ==============================================================================
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,51 +12,62 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# Environment files & Secrets (CRITICAL)
+.env*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
 
-# next.js
+# Database & Persistent storage files
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+data/chroma_db/
+data/*.jsonl
+*.jsonl
+
+# Next.js Build & Outputs
 /.next/
 /out/
-
-# production
 /build
+next-env.d.ts
+*.tsbuildinfo
 
-# misc
+# Python Virtual Environments & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+
+# Testing & Coverage
+/coverage
+
+# Operating System & Temporary Files
 .DS_Store
-*.pem
+Thumbs.db
+*.bak
+*.swp
+*~
 
-# debug
+# Debug & Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 next-dev*.log
 
-# local verification artifacts
+# Deployment & Vercel
+.vercel
+
+# Artifacts
 /artifacts/
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-env/
-*.egg-info/
-.pytest_cache/
-backend/data/
-*.sqlite3
-
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-.vercel
-.env*

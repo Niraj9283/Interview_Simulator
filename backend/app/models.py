@@ -197,3 +197,43 @@ class RAGResumeUploadResponse(BaseModel):
 class RAGStatusResponse(BaseModel):
     status: str
     collections: dict[str, dict]
+
+
+class UserRegisterRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=120)
+    full_name: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=8, max_length=128)
+    role: Literal["candidate", "interviewer"] = "candidate"
+
+
+class UserLoginRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=120)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    email: str
+    role: str
+    expires_in_hours: int = 24
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_active: bool = True
+    created_at: str | None = None
+
+
+class AdminMetricsResponse(BaseModel):
+    status: str
+    environment: str
+    active_sessions: int
+    registered_users: int
+    rag_collections: dict[str, int]
+    rate_limiting_enabled: bool
+    debug_mode: bool
+
