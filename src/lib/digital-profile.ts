@@ -57,137 +57,129 @@ export interface CandidateDigitalProfile {
   ragMemoryContext: string;
 }
 
-const STORAGE_KEY = "mockmate_candidate_digital_profile_v1";
-
-export const DEFAULT_DIGITAL_PROFILE: CandidateDigitalProfile = {
-  candidateId: "cand-default-001",
-  candidateName: "Niraj Sharma",
-  sessionsCompleted: 3,
-  lastInterviewDate: "2026-08-29",
-  overallReadiness: 79,
-  pillars: {
-    technical: {
-      score: 79,
-      skills: {
-        python: { id: "python", name: "Python", score: 91, category: "Technical", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "improving" },
-        ml: { id: "ml", name: "Machine Learning (XGBoost/RF)", score: 84, category: "Technical", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "improving" },
-        sql: { id: "sql", name: "SQL & Query Optimization", score: 72, category: "Technical", assessmentsCount: 3, lastUpdated: "2026-08-28", trend: "stable" },
-        rag: { id: "rag", name: "RAG & LLM Architectures", score: 67, category: "Technical", assessmentsCount: 3, lastUpdated: "2026-08-29", trend: "declining" },
-        system_design: { id: "system_design", name: "System Design & Scalability", score: 78, category: "Technical", assessmentsCount: 2, lastUpdated: "2026-08-29", trend: "improving" },
-        dsa: { id: "dsa", name: "Data Structures & Algorithms", score: 82, category: "Technical", assessmentsCount: 3, lastUpdated: "2026-08-29", trend: "stable" },
-      },
-    },
-    communication: {
-      score: 82,
-      skills: {
-        eye_contact: { id: "eye_contact", name: "Eye Contact & Gaze Stability", score: 82, category: "Communication", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "improving" },
-        pace: { id: "pace", name: "Speaking Pace (120-150 WPM)", score: 88, category: "Communication", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "improving" },
-        voice: { id: "voice", name: "Voice Energy & Acoustic Steadiness", score: 76, category: "Communication", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "stable" },
-        structure: { id: "structure", name: "Answer Structure & STAR Framing", score: 82, category: "Communication", assessmentsCount: 3, lastUpdated: "2026-08-29", trend: "improving" },
-      },
-    },
-    behavioral: {
-      score: 80,
-      skills: {
-        leadership: { id: "leadership", name: "Leadership & Initiative", score: 74, category: "Behavioral", assessmentsCount: 3, lastUpdated: "2026-08-28", trend: "stable" },
-        problem_solving: { id: "problem_solving", name: "Problem Solving & Analytical Rigor", score: 86, category: "Behavioral", assessmentsCount: 4, lastUpdated: "2026-08-29", trend: "improving" },
-        teamwork: { id: "teamwork", name: "Teamwork & Cross-functional Empathy", score: 79, category: "Behavioral", assessmentsCount: 3, lastUpdated: "2026-08-28", trend: "stable" },
-        resilience: { id: "resilience", name: "Composure Under Pressure", score: 80, category: "Behavioral", assessmentsCount: 3, lastUpdated: "2026-08-29", trend: "improving" },
-      },
-    },
-  },
-  sessionHistory: [
-    {
-      id: "sess-101",
-      timestamp: "2026-08-27T10:30:00Z",
-      targetRole: "ML Engineer",
-      department: "Technical",
-      overallScore: 74,
-      technicalScore: 75,
-      communicationScore: 78,
-      behavioralScore: 70,
-      topStrength: "Clear Python fundamentals and data preprocessing workflows",
-      primaryWeakArea: "SQL window functions and slow speaking cadence",
-    },
-    {
-      id: "sess-102",
-      timestamp: "2026-08-28T14:15:00Z",
-      targetRole: "ML Engineer",
-      department: "Technical",
-      overallScore: 78,
-      technicalScore: 78,
-      communicationScore: 81,
-      behavioralScore: 76,
-      topStrength: "Strong explanation of Random Forest vs XGBoost mechanics",
-      primaryWeakArea: "Vector chunk overlap and RAG semantic retrieval",
-    },
-    {
-      id: "sess-103",
-      timestamp: "2026-08-29T16:45:00Z",
-      targetRole: "ML Engineer",
-      department: "Technical",
-      overallScore: 81,
-      technicalScore: 82,
-      communicationScore: 84,
-      behavioralScore: 80,
-      topStrength: "Exemplary 2-pointer algorithmic optimization (Two Sum)",
-      primaryWeakArea: "Deep RAG chunk boundary degradations (scored 67)",
-    },
-  ],
-  ragMemoryContext:
-    "Candidate Niraj Sharma exhibits high mastery in Python (91) and Problem Solving (86). Known growth areas: RAG & LLM Architectures (67) and SQL Optimization (72). In future interviews, probe RAG chunking, vector similarity metrics, and database sharding to measure improvement.",
-};
+const SESSION_STORAGE_KEY = "mockmate_candidate_session_profile_v2";
+const LEGACY_STORAGE_KEY = "mockmate_candidate_digital_profile_v1";
 
 /**
- * Loads the candidate's persistent digital profile from localStorage.
+ * Creates a fresh, clean digital profile with zeroed metrics and the candidate's actual entered name.
  */
-export function loadStoredDigitalProfile(): CandidateDigitalProfile {
+export function createFreshDigitalProfile(candidateName: string = ""): CandidateDigitalProfile {
+  const cleanName = candidateName.trim();
+  return {
+    candidateId: `cand-${Date.now().toString(36)}`,
+    candidateName: cleanName,
+    sessionsCompleted: 0,
+    lastInterviewDate: "None yet",
+    overallReadiness: 0,
+    pillars: {
+      technical: {
+        score: 0,
+        skills: {
+          python: { id: "python", name: "Python", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          ml: { id: "ml", name: "Machine Learning (XGBoost/RF)", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          sql: { id: "sql", name: "SQL & Query Optimization", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          rag: { id: "rag", name: "RAG & LLM Architectures", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          system_design: { id: "system_design", name: "System Design & Scalability", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          dsa: { id: "dsa", name: "Data Structures & Algorithms", score: 0, category: "Technical", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+        },
+      },
+      communication: {
+        score: 0,
+        skills: {
+          eye_contact: { id: "eye_contact", name: "Eye Contact & Gaze Stability", score: 0, category: "Communication", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          pace: { id: "pace", name: "Speaking Pace (120-150 WPM)", score: 0, category: "Communication", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          voice: { id: "voice", name: "Voice Energy & Acoustic Steadiness", score: 0, category: "Communication", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          structure: { id: "structure", name: "Answer Structure & STAR Framing", score: 0, category: "Communication", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+        },
+      },
+      behavioral: {
+        score: 0,
+        skills: {
+          leadership: { id: "leadership", name: "Leadership & Initiative", score: 0, category: "Behavioral", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          problem_solving: { id: "problem_solving", name: "Problem Solving & Analytical Rigor", score: 0, category: "Behavioral", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          teamwork: { id: "teamwork", name: "Teamwork & Cross-functional Empathy", score: 0, category: "Behavioral", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+          resilience: { id: "resilience", name: "Composure Under Pressure", score: 0, category: "Behavioral", assessmentsCount: 0, lastUpdated: "Never", trend: "stable" },
+        },
+      },
+    },
+    sessionHistory: [],
+    ragMemoryContext:
+      "Awaiting first completed interview session in this browser session to calibrate your personalized RAG knowledge memory context.",
+  };
+}
+
+export const DEFAULT_DIGITAL_PROFILE: CandidateDigitalProfile = createFreshDigitalProfile("");
+
+/**
+ * Loads the candidate's digital profile from sessionStorage (automatically resets when the site/tab is closed).
+ * Legacy localStorage data is purged so that stale seeded metrics never re-appear.
+ */
+export function loadStoredDigitalProfile(initialCandidateName?: string): CandidateDigitalProfile {
   if (typeof window === "undefined") {
-    return DEFAULT_DIGITAL_PROFILE;
+    return createFreshDigitalProfile(initialCandidateName);
+  }
+
+  // Purge any legacy localStorage data
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // ignore
   }
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DIGITAL_PROFILE));
-      return DEFAULT_DIGITAL_PROFILE;
+      const fresh = createFreshDigitalProfile(initialCandidateName);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(fresh));
+      return fresh;
     }
-    return JSON.parse(raw) as CandidateDigitalProfile;
+    const parsed = JSON.parse(raw) as CandidateDigitalProfile;
+    if (initialCandidateName && initialCandidateName.trim()) {
+      parsed.candidateName = initialCandidateName.trim();
+    }
+    return parsed;
   } catch {
-    return DEFAULT_DIGITAL_PROFILE;
+    return createFreshDigitalProfile(initialCandidateName);
   }
 }
 
 /**
- * Persists the digital profile to localStorage.
+ * Persists the digital profile to sessionStorage (scoped strictly to the current browser session).
  */
 export function saveDigitalProfile(profile: CandidateDigitalProfile): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(profile));
   } catch {
     // ignore
   }
 }
 
 /**
- * Resets the digital profile to the default baseline.
+ * Resets the digital profile to a fresh baseline with only the currently entered name.
  */
-export function resetDigitalProfile(): CandidateDigitalProfile {
+export function resetDigitalProfile(candidateName?: string): CandidateDigitalProfile {
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DIGITAL_PROFILE));
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // ignore
     }
   }
-  return DEFAULT_DIGITAL_PROFILE;
+  const fresh = createFreshDigitalProfile(candidateName);
+  saveDigitalProfile(fresh);
+  return fresh;
 }
 
 /**
  * Generates an updated RAG memory context string reflecting the candidate's current profile.
  */
 export function generateRAGProfileContext(profile: CandidateDigitalProfile): string {
+  if (profile.sessionsCompleted === 0) {
+    return "Awaiting first completed interview session in this browser session to calibrate your personalized RAG knowledge memory context.";
+  }
+
   const tech = profile.pillars.technical.skills;
   const sortedTech = Object.values(tech).sort((a, b) => b.score - a.score);
   const strongest = sortedTech.slice(0, 2).map((s) => `${s.name} (${s.score})`).join(", ");
@@ -195,8 +187,9 @@ export function generateRAGProfileContext(profile: CandidateDigitalProfile): str
 
   const commScore = profile.pillars.communication.score;
   const behavScore = profile.pillars.behavioral.score;
+  const displayName = profile.candidateName || "Candidate";
 
-  return `Candidate ${profile.candidateName} profile: Top technical strengths: ${strongest}. Priority growth targets: ${weakest}. Communication index: ${commScore}/100, Behavioral index: ${behavScore}/100. Target adaptive probing on ${weakest} to verify conceptual evolution.`;
+  return `Candidate ${displayName} profile: Top technical strengths: ${strongest}. Priority growth targets: ${weakest}. Communication index: ${commScore}/100, Behavioral index: ${behavScore}/100. Target adaptive probing on ${weakest} to verify conceptual evolution.`;
 }
 
 /**

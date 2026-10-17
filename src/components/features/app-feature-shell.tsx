@@ -8,7 +8,10 @@ import { CookieBanner } from "./cookie-banner";
 import { BackToTop } from "./back-to-top";
 import { FloatingContactButton } from "./floating-contact-button";
 import { SiteSearchModal } from "./site-search-modal";
+import { ToastContainer } from "@/components/ui/toast";
+import { SiteFooter } from "@/components/navigation/site-footer";
 import { captureUTM } from "@/lib/utm-tracker";
+import { trackConversion } from "@/lib/conversion-tracking";
 
 export function AppFeatureShell({ children }: { children: React.ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -17,6 +20,9 @@ export function AppFeatureShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Feature #14: Capture UTM parameters on initial load
     captureUTM();
+
+    // Track initial page view conversion
+    trackConversion("page_view");
 
     // Global keyboard shortcut for Site Search (Cmd+K / Ctrl+K)
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,9 +45,15 @@ export function AppFeatureShell({ children }: { children: React.ReactNode }) {
       <ScrollProgressBar />
 
       {/* Main app content */}
-      <div id="main-content" tabIndex={-1} className="outline-none">
+      <div id="main-content" tabIndex={-1} className="outline-none min-h-[85vh]">
         {children}
       </div>
+
+      {/* Feature #18: Internal linking site footer */}
+      <SiteFooter />
+
+      {/* Feature #4: Toast notification container */}
+      <ToastContainer />
 
       {/* Feature #4: Back to top button */}
       <BackToTop />

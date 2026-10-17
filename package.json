@@ -6,19 +6,26 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "npx -y tsx --test tests/interview-generation.test.ts",
+    "test:feedback": "npx -y tsx --test tests/feedback-api.test.ts",
+    "test:all": "npx -y tsx --test tests/interview-generation.test.ts tests/feedback-api.test.ts tests/digital-profile.test.ts",
+    "test:backend": "backend\\.venv\\Scripts\\python.exe -m unittest backend/tests/test_interview_engine.py"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
     "@vercel/analytics": "^2.0.1",
     "lucide-react": "^1.16.0",
     "next": "^16.3.1",
+    "nodemailer": "^10.1.2",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "resend": "^6.34.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <defs>
+    <linearGradient id="appleGlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4D3D" />
+      <stop offset="100%" stop-color="#D9362B" />
+    </linearGradient>
+    <filter id="appleShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#FF4D3D" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="#0A0A0A" stroke="#2A2A2A" stroke-width="4" />
+  <g transform="translate(18, 18) scale(2.25)" filter="url(#appleShadow)">
+    <path d="M32 14 C25 14 20 19 20 25 C17 26 15 29 15 33 C15 37 17 40 20 42 C20 47 24 50 30 50 C31 50 32 50 32 50 C32 50 33 50 34 50 C40 50 44 47 44 42 C47 40 49 37 49 33 C49 29 47 26 44 25 C44 19 39 14 32 14 Z" fill="none" stroke="url(#appleGlowGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M32 16 L32 48" stroke="url(#appleGlowGrad)" stroke-width="2" stroke-dasharray="2 3" />
+    <circle cx="26" cy="24" r="2.5" fill="#FF4D3D" />
+    <circle cx="38" cy="24" r="2.5" fill="#FF4D3D" />
+    <circle cx="24" cy="34" r="2.5" fill="#FF4D3D" />
+    <circle cx="40" cy="34" r="2.5" fill="#FF4D3D" />
+    <circle cx="28" cy="42" r="2.5" fill="#FF4D3D" />
+    <circle cx="36" cy="42" r="2.5" fill="#FF4D3D" />
+    <path d="M26 24 L32 28 L38 24 M24 34 L32 28 L40 34 M28 42 L32 36 L36 42" fill="none" stroke="#FF4D3D" stroke-width="1.5" stroke-opacity="0.8" />
+  </g>
+</svg>

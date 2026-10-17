@@ -316,14 +316,20 @@
           "title": "Financial Analyst",
           "questions": {
             "Role Specific": [
+              "How would you evaluate a company's financial performance using its income statement, balance sheet, and cash flow statement?",
+              "How would you construct a discounted cash flow valuation?",
+              "How would you investigate a discrepancy between a company's reported revenue and its cash receipts?",
+              "Which financial ratios would you use to evaluate liquidity, profitability, and solvency?",
               "How would you analyze a revenue decline across products, regions, and customer segments?",
               "What assumptions do you test first when building a financial forecast?"
             ],
             "Case Study": [
-              "A business unit missed its quarterly margin target by 6 percent. How would you investigate and present the drivers?"
+              "A business unit missed its quarterly margin target by 6 percent. How would you investigate and present the drivers?",
+              "Given an EBITDA of $15M and debt covenants requiring a minimum interest coverage ratio of 3.5x, how would you evaluate headroom under a 10% revenue drop?"
             ],
             "Behavioral": [
-              "Tell me about a time your analysis influenced a leadership decision."
+              "Tell me about a time your financial analysis influenced an executive leadership decision.",
+              "Describe a situation where you had to present complex financial metrics to non-financial stakeholders."
             ]
           }
         },
@@ -728,14 +734,18 @@
           "title": "HR Manager",
           "questions": {
             "Role Specific": [
+              "How would you diagnose attrition and interpret employee engagement data to design effective retention initiatives?",
+              "How do you evaluate workforce planning, compensation bands, and performance management across departments?",
               "How do you set priorities for an HR team supporting multiple business functions?",
               "What routines help you maintain policy consistency while still showing empathy?"
             ],
             "Case Study": [
-              "A senior leader wants to bypass a policy for a high performer. How would you respond?"
+              "A critical department experiences a 25% attrition spike over six months. How would you diagnose the root causes and structure a retention intervention?",
+              "A senior leader wants to bypass a promotion policy for a high performer. How would you handle this conflict?"
             ],
             "Behavioral": [
-              "Describe a time you developed an HR team member."
+              "Describe a time you developed an HR team member or successfully resolved a high-stakes employee relations dispute.",
+              "Tell me about a time you had to deliver difficult organizational restructuring news to employees."
             ]
           }
         }
@@ -773,6 +783,25 @@
             ],
             "Behavioral": [
               "Describe a time you used campaign data to change your plan."
+            ]
+          }
+        },
+        {
+          "title": "Digital Marketing Manager",
+          "questions": {
+            "Role Specific": [
+              "How would you evaluate campaign performance across conversion rates, customer acquisition cost (CAC), and return on advertising spend (ROAS)?",
+              "How do you determine attribution modeling (first-touch, last-touch, multi-touch) for high-budget omnichannel digital campaigns?",
+              "How would you build a digital campaign across paid, owned, and earned channels to optimize audience segmentation and funnel velocity?",
+              "What data tells you whether a campaign needs budget, creative, or targeting changes?"
+            ],
+            "Case Study": [
+              "Traffic increased by 40% but conversions dropped by 18%. How would you diagnose the funnel breakdown and restore CAC efficiency?",
+              "A primary paid acquisition channel reaches diminishing returns with a rising CAC. How would you reallocate budget across channels?"
+            ],
+            "Behavioral": [
+              "Describe a time you used marketing experiment data to convince leadership to pivot campaign strategy.",
+              "Tell me about a high-stakes campaign launch that faced tight deadlines and cross-functional friction."
             ]
           }
         },

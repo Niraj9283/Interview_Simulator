@@ -241,6 +241,7 @@ class RAGEngine:
         question: str,
         answer: str,
         keywords: list[str] | None = None,
+        department: str = "Technical",
     ) -> tuple[str | None, list[str], int, str]:
         """
         Evaluates the technical depth of an answer, detects conceptual gaps/weaknesses,
@@ -254,9 +255,11 @@ class RAGEngine:
 
         # 1. Domain Concept Knowledge Base Mapping
         concept_catalog = [
+            # Technical Concepts
             {
                 "topic_id": "random_forest_selection",
-                "triggers": ["random forest", "decision tree", "ensemble", "bagging", "thyroid", "prediction", "classifier"],
+                "department": "Technical",
+                "triggers": ["random forest", "decision tree", "ensemble", "bagging", "classifier"],
                 "depth_signals": ["variance", "bias", "overfit", "bagging", "bootstrap", "subsampling", "features", "decorrelat", "gini", "depth", "split", "impurity", "trees"],
                 "weak_area": "Random Forest Model Selection & Overfitting Mitigation",
                 "concepts": ["Random Forest", "Decision Trees", "Bagging", "Feature Importance", "Overfitting", "Variance Reduction"],
@@ -265,7 +268,8 @@ class RAGEngine:
             },
             {
                 "topic_id": "class_imbalance",
-                "triggers": ["imbalance", "skew", "smote", "focal loss", "precision", "recall", "rare", "fraud", "anomaly", "intrusion", "attack"],
+                "department": "Technical",
+                "triggers": ["imbalance", "skew", "smote", "focal loss", "precision", "recall", "rare"],
                 "depth_signals": ["smote", "focal loss", "pr-auc", "roc-auc", "recall", "precision", "resampling", "cost-sensitive", "threshold", "f1", "stratified"],
                 "weak_area": "Class Imbalance Handling & Metric Selection",
                 "concepts": ["Class Imbalance", "SMOTE", "Focal Loss", "PR-AUC", "Stratified Sampling", "Cost-Sensitive Learning"],
@@ -274,7 +278,8 @@ class RAGEngine:
             },
             {
                 "topic_id": "shap_interpretability",
-                "triggers": ["shap", "shapley", "explain", "interpret", "black box", "xai", "importance", "feature attribution"],
+                "department": "Technical",
+                "triggers": ["shap", "shapley", "black box", "xai", "feature attribution"],
                 "depth_signals": ["shapley", "game theory", "coalition", "local", "global", "marginal", "treeshap", "attribution", "efficiency", "additivity"],
                 "weak_area": "Model Explainability & SHAP Values",
                 "concepts": ["SHAP", "Shapley Values", "Feature Attributions", "Local Interpretability", "TreeSHAP"],
@@ -283,7 +288,8 @@ class RAGEngine:
             },
             {
                 "topic_id": "rag_vector_search",
-                "triggers": ["rag", "vector", "chroma", "embedding", "retrieval", "chunking", "semantic", "llm"],
+                "department": "Technical",
+                "triggers": ["rag", "vector search", "chroma", "embedding", "chunking", "semantic retrieval"],
                 "depth_signals": ["embedding", "cosine", "similarity", "chunk", "overlap", "rerank", "dense", "sparse", "hallucination", "context window", "hybrid search"],
                 "weak_area": "RAG Retrieval Architecture & Vector Chunking",
                 "concepts": ["Vector Embeddings", "Cosine Distance", "Semantic Chunking", "Reranking", "Hallucination Reduction"],
@@ -292,7 +298,8 @@ class RAGEngine:
             },
             {
                 "topic_id": "python_gil_concurrency",
-                "triggers": ["gil", "concurrency", "multiprocessing", "asyncio", "threading", "generator", "yield", "python"],
+                "department": "Technical",
+                "triggers": ["gil", "python concurrency", "multiprocessing versus asyncio", "thread safe", "python interpreter lock"],
                 "depth_signals": ["gil", "bytecode", "interpreter lock", "cpu-bound", "i/o-bound", "event loop", "memory", "lazy", "iterator", "process pool"],
                 "weak_area": "Python GIL & Concurrency Paradigms",
                 "concepts": ["GIL", "Multiprocessing vs Asyncio", "Generators", "Memory Footprint", "Event Loop"],
@@ -301,40 +308,173 @@ class RAGEngine:
             },
             {
                 "topic_id": "system_design_kafka",
-                "triggers": ["system design", "kafka", "streaming", "throughput", "scalable", "pipeline", "queue", "architecture"],
+                "department": "Technical",
+                "triggers": ["system design", "kafka", "streaming architecture", "throughput", "message queue", "sharding"],
                 "depth_signals": ["partition", "backpressure", "consumer group", "idempotent", "at-least-once", "offset", "replication", "sharding", "cache"],
                 "weak_area": "Streaming Systems & Backpressure Architecture",
                 "concepts": ["Kafka Partitioning", "Backpressure", "Consumer Groups", "Idempotency", "Database Sharding"],
                 "probing_question": "When designing a real-time ingestion pipeline handling 50k events/sec, how do Kafka partitions and consumer group offsets prevent data loss and backpressure bottlenecks?",
                 "advanced_question": "How would you ensure end-to-end exactly-once processing (EOS) semantics across a distributed streaming architecture during node failures?",
             },
+
+            # Finance Concepts
+            {
+                "topic_id": "finance_dcf_valuation",
+                "department": "Finance",
+                "triggers": ["dcf", "discounted cash flow", "valuation", "wacc", "terminal value", "free cash flow", "discount rate"],
+                "depth_signals": ["wacc", "terminal value", "free cash flow", "discount rate", "growth rate", "capm", "beta", "sensitivity", "debt", "equity", "perpetuity", "gordon"],
+                "weak_area": "DCF Valuation Modeling & WACC Estimation",
+                "concepts": ["DCF Valuation", "Free Cash Flow", "WACC", "Terminal Value", "Sensitivity Analysis", "CAPM"],
+                "probing_question": "In your DCF valuation, how did you determine the terminal value growth rate and estimate the cost of equity using CAPM?",
+                "advanced_question": "How would you run a multi-variable Monte Carlo sensitivity simulation on your DCF model to assess valuation ranges under macroeconomic interest rate shocks?",
+            },
+            {
+                "topic_id": "finance_financial_statements",
+                "department": "Finance",
+                "triggers": ["income statement", "balance sheet", "cash flow", "liquidity", "solvency", "profitability", "ebitda", "working capital", "reconciliation"],
+                "depth_signals": ["operating cash flow", "working capital", "depreciation", "amortization", "accruals", "liquidity", "current ratio", "solvency", "leverage", "non-cash"],
+                "weak_area": "Financial Statement Synthesis & Working Capital Analysis",
+                "concepts": ["Three-Statement Modeling", "Cash Conversion Cycle", "Working Capital", "Liquidity Ratios", "EBITDA Reconciliation"],
+                "probing_question": "How do changes in working capital and non-cash expenses reconcile operating profit on the income statement with net cash provided by operating activities?",
+                "advanced_question": "If a company has positive net income but negative operating cash flow for three consecutive quarters, what specific line items on the balance sheet would you investigate first?",
+            },
+            {
+                "topic_id": "finance_budget_variance",
+                "department": "Finance",
+                "triggers": ["budget", "variance", "forecast", "revenue decline", "margin", "capex", "headcount plan", "fp&a"],
+                "depth_signals": ["favorable", "unfavorable", "price-volume", "cost driver", "run rate", "headcount", "opex", "capex", "rolling forecast"],
+                "weak_area": "Budget Variance Diagnostics & Rolling Forecasts",
+                "concepts": ["Variance Analysis", "Price-Volume-Mix", "Rolling Forecasts", "OPEX vs CAPEX", "Run-Rate Analysis"],
+                "probing_question": "When a business unit experiences an unexpected margin decline, how do you perform a price-volume-mix variance analysis to isolate the drivers?",
+                "advanced_question": "How do you structure rolling financial forecasts with scenario modeling to ensure operational flexibility during macroeconomic volatility?",
+            },
+
+            # HR Concepts
+            {
+                "topic_id": "hr_employee_retention",
+                "department": "HR",
+                "triggers": ["retention", "attrition", "turnover", "stay interview", "enps", "employee engagement"],
+                "depth_signals": ["voluntary", "involuntary", "cohort", "tenure", "pulse survey", "exit interview", "root cause", "burnout", "compensation", "intervention"],
+                "weak_area": "Employee Retention Diagnostics & Attrition Mitigation",
+                "concepts": ["Attrition Diagnostics", "Cohort Retention Curves", "Employee Engagement Analytics", "Stay Interview Frameworks"],
+                "probing_question": "When analyzing a spike in turnover within a critical team, how do you distinguish between compensation dissatisfaction, manager friction, and career progression bottlenecks?",
+                "advanced_question": "How would you design a proactive retention early-warning system leveraging engagement telemetry and tenure survival curves?",
+            },
+            {
+                "topic_id": "hr_talent_acquisition",
+                "department": "HR",
+                "triggers": ["talent acquisition", "sourcing", "hiring funnel", "time-to-fill", "offer acceptance", "candidate experience", "structured interview"],
+                "depth_signals": ["funnel", "conversion rate", "pipeline", "sourcing", "scorecard", "rubric", "calibration", "offer acceptance", "pass-through", "diversity"],
+                "weak_area": "Talent Sourcing Strategy & Structured Evaluation",
+                "concepts": ["Structured Interviewing", "Recruiting Funnel Metrics", "Competency Scorecards", "Candidate Pipeline Engineering"],
+                "probing_question": "How do you design competency-based interview scorecards and calibrate interview panels to eliminate subjective interviewer bias?",
+                "advanced_question": "If your offer acceptance rate declines by 15% across candidate cohorts, how would you diagnose competitive market compensation vs candidate journey drop-off?",
+            },
+            {
+                "topic_id": "hr_performance_management",
+                "department": "HR",
+                "triggers": ["performance management", "pip", "employee relations", "investigation", "disciplinary", "policy consistency", "labor standard"],
+                "depth_signals": ["measurable", "objective", "documentation", "neutral", "investigation", "policy", "compliance", "timeline", "escalation", "de-escalation"],
+                "weak_area": "Employee Relations & Objective Performance Management",
+                "concepts": ["Performance Improvement Plans", "Workplace Investigations", "Documentation Integrity", "Policy Governance"],
+                "probing_question": "What documentation and objective milestone standards do you enforce to ensure a Performance Improvement Plan (PIP) is fair, measurable, and legally defensible?",
+                "advanced_question": "How do you conduct an impartial employee relations investigation when senior leadership attempts to influence the outcome?",
+            },
+
+            # Marketing Concepts
+            {
+                "topic_id": "marketing_campaign_roas",
+                "department": "Marketing",
+                "triggers": ["roas", "cac", "paid acquisition", "return on ad spend", "campaign performance", "ad spend", "cpc", "cpm"],
+                "depth_signals": ["roas", "cac", "blended", "payback", "ltv:cac", "marginal", "diminishing returns", "cpa", "channel allocation", "scaling"],
+                "weak_area": "Paid Acquisition Optimization & ROAS Scaling",
+                "concepts": ["ROAS Optimization", "Customer Acquisition Cost", "LTV:CAC Ratio", "Marginal Channel Economics"],
+                "probing_question": "When scaling paid advertising campaigns, how do you detect the point of diminishing marginal ROAS and reallocate budget between discovery and retargeting?",
+                "advanced_question": "How do you balance blended CAC with paid-channel CAC when factoring in organic brand lift from top-of-funnel brand campaigns?",
+            },
+            {
+                "topic_id": "marketing_attribution_modeling",
+                "department": "Marketing",
+                "triggers": ["attribution", "multi-touch", "first-touch", "last-touch", "incrementality", "channel contribution", "marketing mix"],
+                "depth_signals": ["multi-touch", "mta", "incrementality", "first-touch", "last-touch", "linear", "data-driven", "lift test", "halo effect", "cohort"],
+                "weak_area": "Marketing Attribution Modeling & Incrementality Testing",
+                "concepts": ["Multi-Touch Attribution", "Incrementality Testing", "Marketing Mix Modeling", "Cross-Channel Cannibalization"],
+                "probing_question": "Why can last-touch attribution mislead budget allocation in multi-channel buyer journeys, and how would you implement an incrementality testing framework?",
+                "advanced_question": "How do you resolve attribution disputes between organic SEO and paid branded search when both claim conversions?",
+            },
+            {
+                "topic_id": "marketing_funnel_cro",
+                "department": "Marketing",
+                "triggers": ["cro", "conversion rate", "funnel", "landing page", "a/b test", "drop-off", "bounce rate", "lead qualification"],
+                "depth_signals": ["funnel", "drop-off", "conversion rate", "a/b test", "statistical significance", "sample size", "hypothesis", "friction", "activation", "mql"],
+                "weak_area": "Funnel Conversion Rate Optimization & Growth Experiments",
+                "concepts": ["Funnel Diagnostics", "Conversion Rate Optimization", "Hypothesis-Driven A/B Testing", "Lifecycle Activation"],
+                "probing_question": "If website traffic increases by 35% but qualified leads drop by 15%, what diagnostic steps would you take to identify where the funnel is breaking down?",
+                "advanced_question": "How do you calculate minimum sample sizes and run multivariate growth experiments to prevent false positive declarations?",
+            },
         ]
 
-        # 2. Match relevant topic based on question + candidate keywords + answer
+        # 2. Filter catalog to match selected department first
+        dept_catalog = [item for item in concept_catalog if item.get("department") == department]
+        if not dept_catalog:
+            dept_catalog = concept_catalog
+
+        # Match relevant topic based on question + candidate keywords + answer
         matched_catalog = None
-        for item in concept_catalog:
+        for item in dept_catalog:
             if any(t in norm_q for t in item["triggers"]):
                 matched_catalog = item
                 break
 
         if not matched_catalog and keywords:
             kw_str = " ".join(keywords).lower()
-            for item in concept_catalog:
+            for item in dept_catalog:
                 if any(t in kw_str for t in item["triggers"]):
                     matched_catalog = item
                     break
 
         if not matched_catalog:
-            # General Technical Evaluation Fallback
-            matched_catalog = {
-                "topic_id": "general_engineering",
-                "triggers": [],
-                "depth_signals": ["tradeoff", "complexity", "scalability", "latency", "bottleneck", "architecture", "optimization", "monitoring"],
-                "weak_area": "Technical Architecture & Tradeoff Analysis",
-                "concepts": ["Tradeoff Analysis", "System Scalability", "Performance Optimization", "Failure Recovery"],
-                "probing_question": "Can you elaborate on the specific architectural tradeoffs and failure modes you considered in this approach?",
-                "advanced_question": "How would you measure the performance impact and reliability of this solution under 10x production load?",
-            }
+            # Department-safe fallback
+            if department == "Finance":
+                matched_catalog = {
+                    "topic_id": "general_finance",
+                    "triggers": [],
+                    "depth_signals": ["dcf", "cash flow", "wacc", "balance sheet", "ebitda", "working capital", "margin", "variance", "ratio"],
+                    "weak_area": "Financial Analysis & Valuation Methodology",
+                    "concepts": ["Three-Statement Modeling", "DCF Valuation", "Working Capital", "Variance Analysis"],
+                    "probing_question": "Can you elaborate on the financial valuation methodology and key drivers behind your analysis?",
+                    "advanced_question": "How would you stress-test your financial model under macroeconomic liquidity shocks?",
+                }
+            elif department == "HR":
+                matched_catalog = {
+                    "topic_id": "general_hr",
+                    "triggers": [],
+                    "depth_signals": ["retention", "attrition", "engagement", "hiring", "compensation", "performance", "policy", "culture"],
+                    "weak_area": "Workforce Strategy & Employee Relations",
+                    "concepts": ["Talent Acquisition", "Employee Retention", "Performance Management", "Compliance Standards"],
+                    "probing_question": "How would you diagnose the underlying people challenges and structure a measurable HR intervention?",
+                    "advanced_question": "How would you align business leadership around workforce restructuring while maintaining cultural trust?",
+                }
+            elif department == "Marketing":
+                matched_catalog = {
+                    "topic_id": "general_marketing",
+                    "triggers": [],
+                    "depth_signals": ["cac", "roas", "attribution", "funnel", "conversion", "campaign", "segmentation", "ltv", "channel"],
+                    "weak_area": "Marketing Strategy & Performance Optimization",
+                    "concepts": ["Campaign Strategy", "Attribution Modeling", "Customer Acquisition Cost", "Funnel Conversion"],
+                    "probing_question": "What primary metrics and attribution framework would you use to evaluate this marketing strategy?",
+                    "advanced_question": "How would you optimize customer acquisition cost and cross-channel budget allocation under diminishing returns?",
+                }
+            else:
+                matched_catalog = {
+                    "topic_id": "general_engineering",
+                    "triggers": [],
+                    "depth_signals": ["tradeoff", "complexity", "scalability", "latency", "bottleneck", "architecture", "optimization", "monitoring"],
+                    "weak_area": "Technical Architecture & Tradeoff Analysis",
+                    "concepts": ["Tradeoff Analysis", "System Scalability", "Performance Optimization", "Failure Recovery"],
+                    "probing_question": "Can you elaborate on the specific architectural tradeoffs and failure modes you considered in this approach?",
+                    "advanced_question": "How would you measure the performance impact and reliability of this solution under 10x production load?",
+                }
 
         # 3. Calculate Technical Depth Score
         depth_hits = sum(1 for sig in matched_catalog["depth_signals"] if sig in norm_a)

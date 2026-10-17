@@ -5,6 +5,12 @@ import {
   getQuestionsForSelection,
   isInterviewTypeAvailableForDepartment,
   isTrackAvailableForDepartment,
+  getDefaultRoleForDepartment,
+  getDefaultTrackForDepartment,
+  isProjectRelevantToRole,
+  validateQuestionRelevance,
+  applyRoleAppropriateDifficulty,
+  UNRELATED_TECHNICAL_JARGON,
 } from "./role-database";
 import { VoiceTurnStats } from "./voice-analyzer";
 import { PaceTurnStats } from "./speech-tracker";
@@ -191,21 +197,29 @@ export function extractCandidateClaims(text: string): string[] {
 }
 
 export function updateInterviewerMemory(
-  prevMemory: InterviewerMemory,
-  question: string,
-  answer: string,
-  score: number,
-  depthScore: number,
+  prevMemory?: InterviewerMemory,
+  question: string = "",
+  answer: string = "",
+  score: number = 80,
+  depthScore: number = 80,
   weakArea?: string | null,
   historyAnswers: Array<{ answer: string; turnId: number }> = [],
   currentTurnId = 1
 ): { updatedMemory: InterviewerMemory; newConflicts: ConsistencyConflict[] } {
-  const claims = [...prevMemory.claims];
-  const skills_demonstrated = [...prevMemory.skills_demonstrated];
-  const weak_topics = [...prevMemory.weak_topics];
-  const strong_topics = [...prevMemory.strong_topics];
-  const followups_pending = [...prevMemory.followups_pending];
-  const conflicts = [...(prevMemory.conflicts || [])];
+  const safeMemory = prevMemory ?? {
+    claims: [],
+    skills_demonstrated: [],
+    weak_topics: [],
+    strong_topics: [],
+    followups_pending: [],
+    conflicts: [],
+  };
+  const claims = [...(safeMemory.claims ?? [])];
+  const skills_demonstrated = [...(safeMemory.skills_demonstrated ?? [])];
+  const weak_topics = [...(safeMemory.weak_topics ?? [])];
+  const strong_topics = [...(safeMemory.strong_topics ?? [])];
+  const followups_pending = [...(safeMemory.followups_pending ?? [])];
+  const conflicts = [...(safeMemory.conflicts ?? [])];
 
   const extracted = extractCandidateClaims(answer);
   for (const c of extracted) {
@@ -289,83 +303,299 @@ export interface PostInterviewRoadmap {
 
 export function generate7DayRoadmap(
   history: InterviewTurn[],
-  targetRole: string = "Full Stack AI Engineer"
+  targetRole: string = "Full Stack AI Engineer",
+  departmentId?: DepartmentId
 ): PostInterviewRoadmap {
-  const weakAreas = history.map((t) => t.weakArea).filter(Boolean) as string[];
-  const hasRfWeakness = weakAreas.some((w) => w.includes("Random Forest"));
-  const hasImbalanceWeakness = weakAreas.some((w) => w.includes("Class Imbalance") || w.includes("Imbalance"));
-  const hasShapWeakness = weakAreas.some((w) => w.includes("SHAP") || w.includes("Explainability"));
-  const hasRagWeakness = weakAreas.some((w) => w.includes("RAG") || w.includes("Retrieval"));
+  let effectiveDept: DepartmentId = departmentId ?? "Technical";
+  if (!departmentId) {
+    const roleLower = targetRole.toLowerCase();
+    if (roleLower.includes("financ") || roleLower.includes("account") || roleLower.includes("tax") || roleLower.includes("budget") || roleLower.includes("audit") || roleLower.includes("fp&a") || roleLower.includes("payroll specialist")) {
+      effectiveDept = "Finance";
+    } else if (roleLower.includes("hr") || roleLower.includes("talent") || roleLower.includes("recruit") || roleLower.includes("people") || roleLower.includes("onboarding") || roleLower.includes("compensation")) {
+      effectiveDept = "HR";
+    } else if (roleLower.includes("market") || roleLower.includes("brand") || roleLower.includes("seo") || roleLower.includes("campaign") || roleLower.includes("growth") || roleLower.includes("social media")) {
+      effectiveDept = "Marketing";
+    }
+  }
 
-  const days: DayStudyPlan[] = [
-    {
-      day: 1,
-      topic: "Random Forest",
-      focus_area: "Ensemble variance reduction, bagging mechanics, bootstrap aggregation, and out-of-bag (OOB) error bounds.",
-      estimated_hours: 2,
-      intensity: hasRfWeakness ? 90 : 85,
-      practice_challenge: "Implement a 10-tree Random Forest classifier from scratch and benchmark variance reduction over a single deep decision tree.",
-      retrieved_concepts: ["Bootstrap Aggregation", "Decision Trees", "Feature Subsampling", "OOB Score"],
-    },
-    {
-      day: 2,
-      topic: "Model evaluation",
-      focus_area: "Stratified K-Fold cross validation, class-weighted loss, PR-AUC vs ROC-AUC, and calibration curves.",
-      estimated_hours: 2,
-      intensity: 80,
-      practice_challenge: "Write an evaluation pipeline comparing PR-AUC and Brier score for an imbalanced fraud detection dataset.",
-      retrieved_concepts: ["Stratified K-Fold", "PR-AUC vs ROC-AUC", "Brier Score", "Cross-Entropy"],
-    },
-    {
-      day: 3,
-      topic: "Class imbalance",
-      focus_area: "SMOTE synthetic sampling tradeoffs, decision boundary noise, decision threshold moving, and Focal Loss.",
-      estimated_hours: 3,
-      intensity: hasImbalanceWeakness ? 95 : 75,
-      practice_challenge: "Demonstrate why SMOTE degrades decision boundaries near minority outliers versus cost-sensitive threshold tuning.",
-      retrieved_concepts: ["SMOTE Limitations", "Decision Threshold Tuning", "Focal Loss", "Cost-Sensitive Matrix"],
-    },
-    {
-      day: 4,
-      topic: "SHAP",
-      focus_area: "TreeSHAP vs KernelSHAP, game-theoretic Shapley value additivity, and local vs global feature attributions.",
-      estimated_hours: 2,
-      intensity: hasShapWeakness ? 90 : 70,
-      practice_challenge: "Calculate exact Shapley values for a 3-feature cooperative game model and generate summary plots.",
-      retrieved_concepts: ["TreeSHAP", "Shapley Value Additivity", "Global Feature Importance", "Interaction Values"],
-    },
-    {
-      day: 5,
-      topic: "System design",
-      focus_area: "Kafka partition scalability, consumer offset management, Redis cache-aside, and circuit breakers.",
-      estimated_hours: 4,
-      intensity: 90,
-      practice_challenge: "Design an end-to-end distributed ML scoring pipeline handling 50k events/sec with sub-30ms SLA.",
-      retrieved_concepts: ["Kafka Partition Strategy", "Consumer Offset Lag", "Redis Cache-Aside", "Resilience4j"],
-    },
-    {
-      day: 6,
-      topic: "Mock interview",
-      focus_area: "STAR framework structure, forward eye focus stability, steady pacing (130-150 WPM), and eliminating filler words.",
-      estimated_hours: 2,
-      intensity: 80,
-      practice_challenge: "Record 3 practice responses applying the STAR method and keep filler word count under 2.",
-      retrieved_concepts: ["STAR Response Method", "Gaze Focus Steadiness", "Cadence Acceleration Control", "Pause Bridging"],
-    },
-    {
-      day: 7,
-      topic: "Final assessment",
-      focus_area: "Full 6-question senior simulation on the AI Interviewer with dynamic difficulty escalation.",
-      estimated_hours: 2,
-      intensity: 95,
-      practice_challenge: "Achieve an overall score >= 85 with Senior difficulty progression across all rounds.",
-      retrieved_concepts: ["Dynamic Difficulty", "Architectural Tradeoffs", "Interviewer Memory Recall", "End-to-End Delivery"],
-    },
-  ];
+  const weakAreas = history.map((t) => t.weakArea).filter(Boolean) as string[];
+
+  let days: DayStudyPlan[] = [];
+
+  if (effectiveDept === "Finance") {
+    days = [
+      {
+        day: 1,
+        topic: "DCF & Valuation Modeling",
+        focus_area: "Unlevered free cash flow forecasting, terminal growth calibration, and WACC cost of equity/debt estimation.",
+        estimated_hours: 3,
+        intensity: 90,
+        practice_challenge: "Construct a 5-year DCF model with Gordon Growth and exit multiple sensitivities for an enterprise valuation.",
+        retrieved_concepts: ["Unlevered FCF", "WACC Weighting", "Terminal Growth Rate", "Enterprise vs Equity Value"],
+      },
+      {
+        day: 2,
+        topic: "Three-Statement Synthesis",
+        focus_area: "Integrated financial modeling linking income statement, balance sheet, and cash flow statement dynamically.",
+        estimated_hours: 3,
+        intensity: 85,
+        practice_challenge: "Model the balance sheet impact of a $10M debt issuance used for capital expenditures and working capital.",
+        retrieved_concepts: ["Accrual Accounting", "Depreciation Schedules", "Cash Conversion Cycle", "Working Capital"],
+      },
+      {
+        day: 3,
+        topic: "Variance & Margin Analysis",
+        focus_area: "Decomposing revenue shortfalls and cost spikes across products, geography, and fixed vs variable costs.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Build a variance bridge explaining a 6% gross margin miss to executive leadership.",
+        retrieved_concepts: ["Variance Analysis", "Contribution Margin", "Price-Volume-Mix", "EBITDA Bridge"],
+      },
+      {
+        day: 4,
+        topic: "Liquidity & Working Capital",
+        focus_area: "Cash conversion cycle optimization, DSO/DPO/DIO analysis, and short-term liquidity management.",
+        estimated_hours: 2,
+        intensity: 75,
+        practice_challenge: "Analyze a company with growing bookings but negative operating cash flow and recommend treasury actions.",
+        retrieved_concepts: ["DSO & DPO", "Current Ratio", "Operating Cash Flow", "Working Capital Optimization"],
+      },
+      {
+        day: 5,
+        topic: "Debt Covenants & Stress Testing",
+        focus_area: "Interest coverage ratios, debt service coverage (DSCR), leverage covenants, and recessionary headroom testing.",
+        estimated_hours: 3,
+        intensity: 90,
+        practice_challenge: "Run a stress test simulation modeling debt covenant compliance under an 8% revenue contraction.",
+        retrieved_concepts: ["Interest Coverage", "Debt-to-EBITDA", "Covenant Headroom", "Scenario Modeling"],
+      },
+      {
+        day: 6,
+        topic: "Executive Communication",
+        focus_area: "Translating complex financial modeling and risk analyses into crisp executive takeaways for non-financial stakeholders.",
+        estimated_hours: 2,
+        intensity: 75,
+        practice_challenge: "Prepare and deliver a 3-minute executive briefing on capital allocation tradeoffs.",
+        retrieved_concepts: ["Executive Briefing", "Data Visualization", "Risk Synthesis", "Strategic Storytelling"],
+      },
+      {
+        day: 7,
+        topic: "Final Financial Simulation",
+        focus_area: "Comprehensive senior-level simulation defending valuation assumptions, accounting discrepancies, and forecasts.",
+        estimated_hours: 2,
+        intensity: 95,
+        practice_challenge: "Achieve an overall score >= 85 in a full 6-round financial analysis simulation.",
+        retrieved_concepts: ["Financial Ratios", "Valuation Defense", "Audit Reconciliation", "Forecasting Methodology"],
+      },
+    ];
+  } else if (effectiveDept === "HR") {
+    days = [
+      {
+        day: 1,
+        topic: "Attrition Diagnostics",
+        focus_area: "Decomposing turnover metrics by department, tenure, and role using survival curves and pulse survey correlations.",
+        estimated_hours: 3,
+        intensity: 90,
+        practice_challenge: "Design an attrition diagnostic framework to isolate compensation issues from managerial burnout.",
+        retrieved_concepts: ["Voluntary vs Involuntary Attrition", "Cohort Retention", "eNPS Factor Analysis", "Stay Interviews"],
+      },
+      {
+        day: 2,
+        topic: "Competency-Based Hiring",
+        focus_area: "Structured scorecards, role competency frameworks, and interviewer calibration to reduce hiring bias.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Create a 5-competency interview rubric with scoring benchmarks for an engineering or management role.",
+        retrieved_concepts: ["Structured Rubrics", "Competency Scorecards", "Bias Mitigation", "Time-to-Fill Metrics"],
+      },
+      {
+        day: 3,
+        topic: "Employee Relations",
+        focus_area: "Fair investigation protocols, documentation standards, and conflict de-escalation between team members.",
+        estimated_hours: 3,
+        intensity: 85,
+        practice_challenge: "Draft an investigation plan and objective timeline for a confidential employee workplace complaint.",
+        retrieved_concepts: ["Neutral Investigation", "Documentation Integrity", "Conflict De-escalation", "Dispute Resolution"],
+      },
+      {
+        day: 4,
+        topic: "Performance Management",
+        focus_area: "Performance improvement plans (PIPs), clear KPI goal setting, and objective evaluation standards.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Review a poorly phrased PIP and rewrite it with objective, measurable milestones and support checkpoints.",
+        retrieved_concepts: ["Measurable Goals", "Performance Appraisals", "Feedback Frameworks", "Compliance Standards"],
+      },
+      {
+        day: 5,
+        topic: "Compensation & Workforce Planning",
+        focus_area: "Salary band benchmarking, internal pay equity audits, and headcount forecasting across growth phases.",
+        estimated_hours: 3,
+        intensity: 85,
+        practice_challenge: "Evaluate salary band discrepancies across teams and propose an equity adjustment plan within budget.",
+        retrieved_concepts: ["Pay Equity", "Compensation Bands", "Workforce Headcount", "Market Benchmarking"],
+      },
+      {
+        day: 6,
+        topic: "Empathy & Leadership Advisory",
+        focus_area: "Counseling senior executives on difficult talent decisions, organizational restructuring, and cultural trust.",
+        estimated_hours: 2,
+        intensity: 75,
+        practice_challenge: "Roleplay advising a stubborn department lead to adhere to promotion guidelines.",
+        retrieved_concepts: ["Executive Presence", "Cultural Alignment", "Change Management", "Trust Building"],
+      },
+      {
+        day: 7,
+        topic: "Final HR Leadership Simulation",
+        focus_area: "Full 6-question simulation covering retention interventions, policy edge cases, and talent strategy.",
+        estimated_hours: 2,
+        intensity: 95,
+        practice_challenge: "Complete a full HR simulation achieving high marks on empathy, clarity, and structural rigor.",
+        retrieved_concepts: ["HR Strategy", "Retention Playbooks", "Regulatory Compliance", "Cross-Functional Leadership"],
+      },
+    ];
+  } else if (effectiveDept === "Marketing") {
+    days = [
+      {
+        day: 1,
+        topic: "Attribution Modeling",
+        focus_area: "Multi-touch attribution (MTA), first/last touch limitations, and measuring incremental lift across channels.",
+        estimated_hours: 3,
+        intensity: 90,
+        practice_challenge: "Compare linear, time-decay, and position-based attribution models for an omnichannel marketing budget.",
+        retrieved_concepts: ["Multi-Touch Attribution", "Incrementality Lift", "First vs Last Touch", "Channel Contribution"],
+      },
+      {
+        day: 2,
+        topic: "CAC & ROAS Optimization",
+        focus_area: "Blended vs paid customer acquisition cost, payback period modeling, and identifying diminishing return thresholds.",
+        estimated_hours: 3,
+        intensity: 85,
+        practice_challenge: "Calculate the marginal ROAS of an overspending paid channel and design a budget reallocation strategy.",
+        retrieved_concepts: ["Blended vs Paid CAC", "Payback Periods", "Marginal ROAS", "Budget Optimization"],
+      },
+      {
+        day: 3,
+        topic: "Funnel & CRO Diagnostics",
+        focus_area: "Identifying friction points in visitor-to-lead and lead-to-customer funnels using cohort analysis and heatmaps.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Diagnose an 18% conversion drop on a paid landing page and propose 3 multivariate test hypotheses.",
+        retrieved_concepts: ["CRO Methodology", "Funnel Drop-Off", "Multivariate Testing", "User Journey Friction"],
+      },
+      {
+        day: 4,
+        topic: "Audience Segmentation & LTV",
+        focus_area: "Behavioral cohort segmentation, customer lifetime value (LTV) forecasting, and retention curves.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Analyze 90-day cohort retention data to identify the highest-LTV customer acquisition segments.",
+        retrieved_concepts: ["Cohort Retention", "LTV-to-CAC Ratio", "Behavioral Clusters", "Lifecycle Marketing"],
+      },
+      {
+        day: 5,
+        topic: "Omnichannel Campaign Strategy",
+        focus_area: "Coordinating messaging across search, paid social, email nurturing, and content to maximize pipeline velocity.",
+        estimated_hours: 3,
+        intensity: 85,
+        practice_challenge: "Develop an end-to-end launch plan for a new product tier with integrated channel KPIs.",
+        retrieved_concepts: ["Omnichannel Architecture", "Campaign Messaging", "Pipeline Velocity", "Creative Iteration"],
+      },
+      {
+        day: 6,
+        topic: "Data Storytelling & Stakeholder Buy-in",
+        focus_area: "Presenting marketing experiment results and budget requests clearly to executive leadership.",
+        estimated_hours: 2,
+        intensity: 75,
+        practice_challenge: "Present a campaign post-mortem explaining why a test failed and what actionable learnings were gained.",
+        retrieved_concepts: ["Experimentation Readout", "Data Storytelling", "Executive Reporting", "Hypothesis Validation"],
+      },
+      {
+        day: 7,
+        topic: "Final Marketing Simulation",
+        focus_area: "Full 6-question simulation covering CAC scaling, attribution disputes, and growth campaign strategy.",
+        estimated_hours: 2,
+        intensity: 95,
+        practice_challenge: "Score >= 85 across all marketing competencies in a senior growth marketing interview round.",
+        retrieved_concepts: ["Growth Strategy", "Attribution Governance", "Budget Defense", "Creative Strategy"],
+      },
+    ];
+  } else {
+    // Technical Department
+    const hasRfWeakness = weakAreas.some((w) => w.includes("Random Forest"));
+    const hasImbalanceWeakness = weakAreas.some((w) => w.includes("Class Imbalance") || w.includes("Imbalance"));
+    const hasShapWeakness = weakAreas.some((w) => w.includes("SHAP") || w.includes("Explainability"));
+
+    days = [
+      {
+        day: 1,
+        topic: "Random Forest",
+        focus_area: "Ensemble variance reduction, bagging mechanics, bootstrap aggregation, and out-of-bag (OOB) error bounds.",
+        estimated_hours: 2,
+        intensity: hasRfWeakness ? 90 : 85,
+        practice_challenge: "Implement a 10-tree Random Forest classifier from scratch and benchmark variance reduction over a single deep decision tree.",
+        retrieved_concepts: ["Bootstrap Aggregation", "Decision Trees", "Feature Subsampling", "OOB Score"],
+      },
+      {
+        day: 2,
+        topic: "Model evaluation",
+        focus_area: "Stratified K-Fold cross validation, class-weighted loss, PR-AUC vs ROC-AUC, and calibration curves.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Write an evaluation pipeline comparing PR-AUC and Brier score for an imbalanced fraud detection dataset.",
+        retrieved_concepts: ["Stratified K-Fold", "PR-AUC vs ROC-AUC", "Brier Score", "Cross-Entropy"],
+      },
+      {
+        day: 3,
+        topic: "Class imbalance",
+        focus_area: "SMOTE synthetic sampling tradeoffs, decision boundary noise, decision threshold moving, and Focal Loss.",
+        estimated_hours: 3,
+        intensity: hasImbalanceWeakness ? 95 : 75,
+        practice_challenge: "Demonstrate why SMOTE degrades decision boundaries near minority outliers versus cost-sensitive threshold tuning.",
+        retrieved_concepts: ["SMOTE Limitations", "Decision Threshold Tuning", "Focal Loss", "Cost-Sensitive Matrix"],
+      },
+      {
+        day: 4,
+        topic: "SHAP",
+        focus_area: "TreeSHAP vs KernelSHAP, game-theoretic Shapley value additivity, and local vs global feature attributions.",
+        estimated_hours: 2,
+        intensity: hasShapWeakness ? 90 : 70,
+        practice_challenge: "Calculate exact Shapley values for a 3-feature cooperative game model and generate summary plots.",
+        retrieved_concepts: ["TreeSHAP", "Shapley Value Additivity", "Global Feature Importance", "Interaction Values"],
+      },
+      {
+        day: 5,
+        topic: "System design",
+        focus_area: "Kafka partition scalability, consumer offset management, Redis cache-aside, and circuit breakers.",
+        estimated_hours: 4,
+        intensity: 90,
+        practice_challenge: "Design an end-to-end distributed ML scoring pipeline handling 50k events/sec with sub-30ms SLA.",
+        retrieved_concepts: ["Kafka Partition Strategy", "Consumer Offset Lag", "Redis Cache-Aside", "Resilience4j"],
+      },
+      {
+        day: 6,
+        topic: "Mock interview",
+        focus_area: "STAR framework structure, forward eye focus stability, steady pacing (130-150 WPM), and eliminating filler words.",
+        estimated_hours: 2,
+        intensity: 80,
+        practice_challenge: "Record 3 practice responses applying the STAR method and keep filler word count under 2.",
+        retrieved_concepts: ["STAR Response Method", "Gaze Focus Steadiness", "Cadence Acceleration Control", "Pause Bridging"],
+      },
+      {
+        day: 7,
+        topic: "Final assessment",
+        focus_area: "Full 6-question senior simulation on the AI Interviewer with dynamic difficulty escalation.",
+        estimated_hours: 2,
+        intensity: 95,
+        practice_challenge: "Achieve an overall score >= 85 with Senior difficulty progression across all rounds.",
+        retrieved_concepts: ["Dynamic Difficulty", "Architectural Tradeoffs", "Interviewer Memory Recall", "End-to-End Delivery"],
+      },
+    ];
+  }
 
   return {
     title: "7-Day Personalized Improvement Roadmap",
-    summary: `Structured curriculum targeting identified gaps in ${weakAreas.slice(0, 3).join(", ") || "Foundational ML & Architecture"}.`,
+    summary: `Structured curriculum targeting identified competencies in ${weakAreas.slice(0, 3).join(", ") || targetRole}.`,
     target_role: targetRole,
     days,
     total_hours: days.reduce((sum, d) => sum + d.estimated_hours, 0),
@@ -538,117 +768,33 @@ export interface SkillGapReport {
 
 export function generateSkillGapReport(
   history: InterviewTurn[],
-  targetRole: string = "Full Stack AI Engineer"
+  targetRole: string = "Full Stack AI Engineer",
+  departmentId?: DepartmentId
 ): SkillGapReport {
-  let pythonScore = 92;
-  let mlScore = 87;
-  let sqlScore = 72;
-  let ragScore = 51;
-  let systemDesignScore = 43;
-  let commScore = 70;
-
-  if (history.length > 0) {
-    const avg = (nums: number[]) => (nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 70);
-    const avgScore = avg(history.map((t) => t.score));
-    const avgEyeContact = avg(history.map((t) => t.breakdown?.eye_contact ?? 70));
-    const avgStructure = avg(history.map((t) => t.breakdown?.answer_structure ?? 70));
-    const avgPace = avg(history.map((t) => t.breakdown?.speaking_pace ?? 75));
-    const avgFillers = avg(history.map((t) => t.breakdown?.filler_words ?? 85));
-
-    commScore = Math.max(
-      35,
-      Math.min(98, Math.round(0.3 * avgEyeContact + 0.3 * avgStructure + 0.2 * avgPace + 0.2 * avgFillers))
-    );
-
-    history.forEach((t) => {
-      const text = `${t.question.toLowerCase()} ${t.answer.toLowerCase()}`;
-      const accuracy = t.breakdown?.technical_accuracy ?? t.score;
-
-      if (
-        text.includes("system design") ||
-        text.includes("concurrency") ||
-        text.includes("throughput") ||
-        text.includes("scale") ||
-        text.includes("kafka") ||
-        text.includes("streaming") ||
-        text.includes("tradeoff")
-      ) {
-        if (t.weakArea || accuracy < 70) {
-          systemDesignScore = Math.min(systemDesignScore, accuracy - 15);
-        } else {
-          systemDesignScore = Math.max(systemDesignScore, accuracy);
-        }
-      }
-
-      if (
-        text.includes("rag") ||
-        text.includes("retrieval") ||
-        text.includes("embedding") ||
-        text.includes("chroma") ||
-        text.includes("vector") ||
-        text.includes("chunk")
-      ) {
-        if (t.weakArea || accuracy < 70) {
-          ragScore = Math.min(ragScore, accuracy - 10);
-        } else {
-          ragScore = Math.max(ragScore, accuracy);
-        }
-      }
-
-      if (
-        text.includes("random forest") ||
-        text.includes("decision tree") ||
-        text.includes("shap") ||
-        text.includes("imbalance") ||
-        text.includes("smote") ||
-        text.includes("model") ||
-        text.includes("classification")
-      ) {
-        if (t.weakArea || accuracy < 70) {
-          mlScore = Math.min(mlScore, accuracy);
-        } else {
-          mlScore = Math.max(mlScore, accuracy);
-        }
-      }
-
-      if (
-        text.includes("python") ||
-        text.includes("gil") ||
-        text.includes("multiprocessing") ||
-        text.includes("asyncio") ||
-        text.includes("threading") ||
-        text.includes("decorator")
-      ) {
-        if (t.weakArea || accuracy < 70) {
-          pythonScore = Math.min(pythonScore, accuracy);
-        } else {
-          pythonScore = Math.max(pythonScore, accuracy);
-        }
-      }
-
-      if (
-        text.includes("sql") ||
-        text.includes("database") ||
-        text.includes("query") ||
-        text.includes("join") ||
-        text.includes("index") ||
-        text.includes("schema")
-      ) {
-        if (t.weakArea || accuracy < 70) {
-          sqlScore = Math.min(sqlScore, accuracy);
-        } else {
-          sqlScore = Math.max(sqlScore, accuracy);
-        }
-      }
-    });
+  // Infer effective department if not provided
+  let effectiveDept: DepartmentId = departmentId ?? "Technical";
+  if (!departmentId) {
+    const roleLower = targetRole.toLowerCase();
+    if (roleLower.includes("financ") || roleLower.includes("account") || roleLower.includes("tax") || roleLower.includes("budget") || roleLower.includes("audit") || roleLower.includes("fp&a") || roleLower.includes("payroll specialist")) {
+      effectiveDept = "Finance";
+    } else if (roleLower.includes("hr") || roleLower.includes("talent") || roleLower.includes("recruit") || roleLower.includes("people") || roleLower.includes("onboarding") || roleLower.includes("compensation")) {
+      effectiveDept = "HR";
+    } else if (roleLower.includes("market") || roleLower.includes("brand") || roleLower.includes("seo") || roleLower.includes("campaign") || roleLower.includes("growth") || roleLower.includes("social media")) {
+      effectiveDept = "Marketing";
+    }
   }
 
-  pythonScore = Math.max(30, Math.min(98, pythonScore));
-  mlScore = Math.max(30, Math.min(98, mlScore));
-  sqlScore = Math.max(30, Math.min(98, sqlScore));
-  ragScore = Math.max(30, Math.min(98, ragScore));
-  systemDesignScore = Math.max(30, Math.min(98, systemDesignScore));
-  commScore = Math.max(30, Math.min(98, commScore));
+  const avg = (nums: number[]) => (nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 70);
+  const avgScore = history.length ? avg(history.map((t) => t.score)) : 70;
+  const avgEyeContact = history.length ? avg(history.map((t) => t.breakdown?.eye_contact ?? 70)) : 70;
+  const avgStructure = history.length ? avg(history.map((t) => t.breakdown?.answer_structure ?? 70)) : 70;
+  const avgPace = history.length ? avg(history.map((t) => t.breakdown?.speaking_pace ?? 75)) : 75;
+  const avgFillers = history.length ? avg(history.map((t) => t.breakdown?.filler_words ?? 85)) : 85;
+
+  const commScore = Math.max(
+    35,
+    Math.min(98, Math.round(0.3 * avgEyeContact + 0.3 * avgStructure + 0.2 * avgPace + 0.2 * avgFillers))
+  );
 
   const getLevel = (s: number): "Advanced" | "Proficient" | "Needs Improvement" | "Critical Gap" => {
     if (s >= 85) return "Advanced";
@@ -657,157 +803,390 @@ export function generateSkillGapReport(
     return "Critical Gap";
   };
 
-  const skills: SkillScore[] = [
-    { name: "Python", score: pythonScore, level: getLevel(pythonScore), category: "Programming" },
-    { name: "Machine Learning", score: mlScore, level: getLevel(mlScore), category: "AI & Algorithms" },
-    { name: "SQL & Data", score: sqlScore, level: getLevel(sqlScore), category: "Data Engineering" },
-    { name: "RAG & Vector Retrieval", score: ragScore, level: getLevel(ragScore), category: "Generative AI" },
-    { name: "System Design", score: systemDesignScore, level: getLevel(systemDesignScore), category: "Architecture" },
-    { name: "Communication", score: commScore, level: getLevel(commScore), category: "Non-Verbal & Delivery" },
-  ];
-
-  const sorted = [...skills].sort((a, b) => a.score - b.score);
-  const lowestSkill = sorted[0];
-  const highestPriorityArea = lowestSkill.name;
-
+  let skills: SkillScore[] = [];
   let curriculumTree: TopicCurriculumNode[] = [];
   let actionableSteps: string[] = [];
   let retrievedSources: string[] = [];
 
-  if (highestPriorityArea === "System Design" || lowestSkill.score <= 55) {
+  if (effectiveDept === "Finance") {
+    let dcfScore = avgScore >= 75 ? 82 : avgScore;
+    let statementScore = avgScore >= 75 ? 85 : avgScore;
+    let forecastScore = 74;
+    let liquidityScore = 70;
+
+    history.forEach((t) => {
+      const text = `${t.question.toLowerCase()} ${t.answer.toLowerCase()}`;
+      const acc = t.breakdown?.technical_accuracy ?? t.score;
+      if (text.includes("dcf") || text.includes("discounted cash flow") || text.includes("wacc") || text.includes("valuation") || text.includes("terminal value")) {
+        dcfScore = t.weakArea || acc < 70 ? Math.min(dcfScore, acc - 10) : Math.max(dcfScore, acc);
+      }
+      if (text.includes("income statement") || text.includes("balance sheet") || text.includes("cash flow") || text.includes("ebitda") || text.includes("ratio")) {
+        statementScore = t.weakArea || acc < 70 ? Math.min(statementScore, acc - 10) : Math.max(statementScore, acc);
+      }
+      if (text.includes("forecast") || text.includes("budget") || text.includes("variance") || text.includes("margin") || text.includes("revenue decline")) {
+        forecastScore = t.weakArea || acc < 70 ? Math.min(forecastScore, acc - 10) : Math.max(forecastScore, acc);
+      }
+      if (text.includes("liquidity") || text.includes("working capital") || text.includes("solvency") || text.includes("cash receipts") || text.includes("debt")) {
+        liquidityScore = t.weakArea || acc < 70 ? Math.min(liquidityScore, acc - 10) : Math.max(liquidityScore, acc);
+      }
+    });
+
+    skills = [
+      { name: "DCF & Valuation Modeling", score: Math.max(30, Math.min(98, dcfScore)), level: getLevel(dcfScore), category: "Financial Analysis" },
+      { name: "Three-Statement Analysis", score: Math.max(30, Math.min(98, statementScore)), level: getLevel(statementScore), category: "Financial Reporting" },
+      { name: "Budgeting & Variance Analysis", score: Math.max(30, Math.min(98, forecastScore)), level: getLevel(forecastScore), category: "Corporate Finance" },
+      { name: "Liquidity & Working Capital", score: Math.max(30, Math.min(98, liquidityScore)), level: getLevel(liquidityScore), category: "Treasury & Risk" },
+      { name: "Executive Presentation", score: commScore, level: getLevel(commScore), category: "Stakeholder Communication" },
+    ];
+
     curriculumTree = [
       {
-        name: "REST APIs & Protocol Architecture",
-        description: "API idempotency, HTTP status semantics, gRPC vs REST, and contract serialization.",
-        difficulty: "Foundational",
-        key_topics: ["Idempotency Keys", "HTTP Status 429/503", "gRPC Protobuf vs JSON", "Rate Limiting"],
-        estimated_study_hours: 4,
-      },
-      {
-        name: "Caching & In-Memory Stores",
-        description: "Redis caching patterns, cache-aside, write-through, and LRU/LFU eviction algorithms.",
-        difficulty: "Intermediate",
-        key_topics: ["Cache-Aside Pattern", "Cache Stampede Mitigation", "Redis Eviction Policies", "TTL Strategies"],
-        estimated_study_hours: 6,
-      },
-      {
-        name: "Databases & Horizontal Sharding",
-        description: "Relational vs NoSQL trade-offs, B-Tree index optimization, sharding keys, and replication lag.",
-        difficulty: "Intermediate",
-        key_topics: ["B-Tree vs LSM Trees", "Horizontal Sharding Keys", "Read Replicas", "ACID vs BASE"],
+        name: "DCF Valuation & WACC Calibration",
+        description: "Free cash flow projections, cost of equity (CAPM), cost of debt, and Gordon Growth terminal value sensitivity.",
+        difficulty: "Advanced",
+        key_topics: ["Unlevered Free Cash Flow", "WACC Weighting", "Terminal Growth Rate Sensitivity", "Enterprise vs Equity Value"],
         estimated_study_hours: 8,
       },
       {
-        name: "Scalability & Load Balancing",
-        description: "Stateless compute scaling, reverse proxies (Nginx/Envoy), token bucket, and circuit breakers.",
-        difficulty: "Advanced",
-        key_topics: ["Consistent Hashing", "Token Bucket Algorithm", "Circuit Breakers (Resilience4j)", "Health Probes"],
+        name: "Three-Statement Modeling & Reconciliation",
+        description: "Dynamic linking of income statement, balance sheet, and statement of cash flows with working capital schedules.",
+        difficulty: "Intermediate",
+        key_topics: ["Accrual vs Cash Accounting", "Depreciation Schedules", "Cash Conversion Cycle", "Working Capital Swings"],
         estimated_study_hours: 6,
       },
       {
-        name: "Message Queues & Event Streaming",
-        description: "Apache Kafka partition scalability, consumer group offset commits, and backpressure management.",
-        difficulty: "Advanced",
-        key_topics: ["Kafka Partition Strategy", "Consumer Offset Lag", "At-Least-Once Delivery", "Dead Letter Queues"],
-        estimated_study_hours: 8,
-      },
-      {
-        name: "Distributed Systems & Consensus",
-        description: "CAP theorem tradeoffs, PACELC, distributed locks (Redlock), and zero-downtime deployment.",
-        difficulty: "Advanced",
-        key_topics: ["CAP / PACELC Theorems", "Distributed Locking", "Two-Phase Commit (2PC)", "Canary Deployments"],
-        estimated_study_hours: 10,
+        name: "Financial Ratio Diagnostics & Solvency Analysis",
+        description: "Evaluating liquidity (quick/current ratio), profitability (ROIC/ROE), and leverage coverage (interest coverage, debt-to-EBITDA).",
+        difficulty: "Intermediate",
+        key_topics: ["Current & Quick Ratios", "DuPont Analysis", "Interest Coverage Covenants", "EBITDA Bridge"],
+        estimated_study_hours: 5,
       },
     ];
 
     actionableSteps = [
-      "Review the ChromaDB System Design Knowledge Collection for Kafka partition sizing and Redis caching rubrics.",
-      "Design an end-to-end distributed URL shortener or rate limiter handling 50k requests/second.",
-      "Practice articulating trade-offs out loud: compute time vs memory overhead and availability vs consistency.",
+      "Build a dynamic 3-statement financial model with integrated debt schedule and sensitivity tables in Excel.",
+      "Practice narrating valuation variances and macroeconomic interest rate impacts during mock interviews.",
     ];
 
     retrievedSources = [
-      "chroma://technical_knowledge/system_design_scalability_rubric",
-      "chroma://technical_knowledge/distributed_caching_redis_patterns",
-      "chroma://technical_knowledge/kafka_partitioning_streaming_slas",
-      "chroma://interview_knowledge/system_design_faang_questions",
+      "corporate_finance://valuation_and_dcf_rubrics",
+      "corporate_finance://three_statement_financial_modeling",
+      "corporate_finance://working_capital_and_solvency_analysis",
     ];
-  } else if (highestPriorityArea === "RAG & Vector Retrieval") {
+  } else if (effectiveDept === "HR") {
+    let talentScore = avgScore >= 75 ? 85 : avgScore;
+    let retentionScore = avgScore >= 75 ? 80 : avgScore;
+    let perfScore = 76;
+    let compScore = 72;
+
+    history.forEach((t) => {
+      const text = `${t.question.toLowerCase()} ${t.answer.toLowerCase()}`;
+      const acc = t.breakdown?.technical_accuracy ?? t.score;
+      if (text.includes("sourc") || text.includes("recruiting") || text.includes("interview") || text.includes("hiring")) {
+        talentScore = t.weakArea || acc < 70 ? Math.min(talentScore, acc - 10) : Math.max(talentScore, acc);
+      }
+      if (text.includes("retention") || text.includes("attrition") || text.includes("engagement") || text.includes("turnover")) {
+        retentionScore = t.weakArea || acc < 70 ? Math.min(retentionScore, acc - 10) : Math.max(retentionScore, acc);
+      }
+      if (text.includes("performance") || text.includes("relations") || text.includes("conflict") || text.includes("investigation")) {
+        perfScore = t.weakArea || acc < 70 ? Math.min(perfScore, acc - 10) : Math.max(perfScore, acc);
+      }
+      if (text.includes("compensation") || text.includes("benefits") || text.includes("policy") || text.includes("workforce")) {
+        compScore = t.weakArea || acc < 70 ? Math.min(compScore, acc - 10) : Math.max(compScore, acc);
+      }
+    });
+
+    skills = [
+      { name: "Talent Acquisition & Sourcing", score: Math.max(30, Math.min(98, talentScore)), level: getLevel(talentScore), category: "Recruiting" },
+      { name: "Employee Retention & Diagnostics", score: Math.max(30, Math.min(98, retentionScore)), level: getLevel(retentionScore), category: "Talent Management" },
+      { name: "Employee Relations & Conflict", score: Math.max(30, Math.min(98, perfScore)), level: getLevel(perfScore), category: "People Operations" },
+      { name: "Workforce Planning & Compliance", score: Math.max(30, Math.min(98, compScore)), level: getLevel(compScore), category: "HR Strategy" },
+      { name: "Stakeholder Empathy & Alignment", score: commScore, level: getLevel(commScore), category: "Leadership Delivery" },
+    ];
+
     curriculumTree = [
       {
-        name: "Semantic Chunking & Boundary Preservation",
-        description: "Optimizing chunk sizes (256–1024 tokens) and overlap to avoid splitting named entities.",
-        difficulty: "Foundational",
-        key_topics: ["Sentence Boundary Splitters", "Context Overlap", "Metadata Injection"],
-        estimated_study_hours: 4,
+        name: "Attrition Root-Cause Diagnostics & Retention Engineering",
+        description: "Cohort retention curve analysis, engagement pulse analytics, and structured stay-interview frameworks.",
+        difficulty: "Advanced",
+        key_topics: ["Voluntary vs Involuntary Attrition", "Cohort Retention Curves", "eNPS Factor Decomposition", "Intervention Playbooks"],
+        estimated_study_hours: 6,
       },
       {
-        name: "Dense Embeddings & Metric Spaces",
-        description: "Sentence-transformers, cosine similarity vs dot product, and vector normalization.",
+        name: "Structured Competency Interviewing & Funnel Metrics",
+        description: "Designing behavioral rubrics, interviewer calibration, and optimizing time-to-fill with candidate quality scores.",
         difficulty: "Intermediate",
-        key_topics: ["Normalized Cosine Distance", "Embedding Dimensionality", "Multilingual Embeddings"],
+        key_topics: ["Competency Scorecards", "Unconscious Bias Mitigation", "Offer Acceptance Optimization", "Pipeline Conversion"],
         estimated_study_hours: 5,
       },
       {
-        name: "Vector Indexing (HNSW / IVF-PQ)",
-        description: "Graph-based indexing structures for sub-10ms Approximate Nearest Neighbor (ANN) search.",
-        difficulty: "Advanced",
-        key_topics: ["HNSW M & efSearch Parameters", "Product Quantization", "Memory Compression"],
-        estimated_study_hours: 7,
-      },
-      {
-        name: "Retrieval Reranking & Hybrid Search",
-        description: "Combining BM25 keyword search with dense embeddings via Reciprocal Rank Fusion (RRF).",
-        difficulty: "Advanced",
-        key_topics: ["Cross-Encoder Rerankers", "RRF Score Merging", "Query Expansion"],
-        estimated_study_hours: 6,
+        name: "Employee Relations & Policy Governance",
+        description: "Fair investigation procedures, compliant documentation standards, and balancing leadership demands with employee trust.",
+        difficulty: "Intermediate",
+        key_topics: ["Neutral Investigation Protocols", "Performance Improvement Plans", "Employment Law Basics", "Escalation Paths"],
+        estimated_study_hours: 5,
       },
     ];
 
     actionableSteps = [
-      "Benchmark retrieval accuracy on your sample resumes with 256 vs 512 token chunk sizes.",
-      "Implement a cross-encoder reranker on top of ChromaDB query results.",
+      "Review the People Analytics rubric for turnover root-cause diagnosis and structured exit interview synthesis.",
+      "Practice de-escalating managerial policy conflicts using clear, empathetic frameworks.",
     ];
 
     retrievedSources = [
-      "chroma://technical_knowledge/rag_chunking_retrieval_rubrics",
-      "chroma://technical_knowledge/vector_databases_chroma_hnsw",
+      "hr_knowledge://employee_retention_and_attrition_analytics",
+      "hr_knowledge://structured_competency_interviewing",
+      "hr_knowledge://employee_relations_investigation_standards",
+    ];
+  } else if (effectiveDept === "Marketing") {
+    let campaignScore = avgScore >= 75 ? 84 : avgScore;
+    let acqScore = avgScore >= 75 ? 80 : avgScore;
+    let analyticsScore = 75;
+    let brandScore = 72;
+
+    history.forEach((t) => {
+      const text = `${t.question.toLowerCase()} ${t.answer.toLowerCase()}`;
+      const acc = t.breakdown?.technical_accuracy ?? t.score;
+      if (text.includes("campaign") || text.includes("omnichannel") || text.includes("social") || text.includes("email")) {
+        campaignScore = t.weakArea || acc < 70 ? Math.min(campaignScore, acc - 10) : Math.max(campaignScore, acc);
+      }
+      if (text.includes("cac") || text.includes("acquisition") || text.includes("conversion") || text.includes("funnel") || text.includes("cro")) {
+        acqScore = t.weakArea || acc < 70 ? Math.min(acqScore, acc - 10) : Math.max(acqScore, acc);
+      }
+      if (text.includes("attribution") || text.includes("roas") || text.includes("analytics") || text.includes("ltv") || text.includes("metrics")) {
+        analyticsScore = t.weakArea || acc < 70 ? Math.min(analyticsScore, acc - 10) : Math.max(analyticsScore, acc);
+      }
+      if (text.includes("brand") || text.includes("positioning") || text.includes("content") || text.includes("messaging") || text.includes("audience")) {
+        brandScore = t.weakArea || acc < 70 ? Math.min(brandScore, acc - 10) : Math.max(brandScore, acc);
+      }
+    });
+
+    skills = [
+      { name: "Campaign Strategy & Omnichannel", score: Math.max(30, Math.min(98, campaignScore)), level: getLevel(campaignScore), category: "Digital Marketing" },
+      { name: "Customer Acquisition & CRO", score: Math.max(30, Math.min(98, acqScore)), level: getLevel(acqScore), category: "Growth & Conversion" },
+      { name: "Marketing Analytics & Attribution", score: Math.max(30, Math.min(98, analyticsScore)), level: getLevel(analyticsScore), category: "Performance Metrics" },
+      { name: "Brand Positioning & Messaging", score: Math.max(30, Math.min(98, brandScore)), level: getLevel(brandScore), category: "Brand Strategy" },
+      { name: "Executive Storytelling & Delivery", score: commScore, level: getLevel(commScore), category: "Stakeholder Presentation" },
+    ];
+
+    curriculumTree = [
+      {
+        name: "Multi-Touch Attribution & CAC / ROAS Optimization",
+        description: "Comparing first-touch, last-touch, and data-driven multi-touch attribution models to optimize blended marketing payback periods.",
+        difficulty: "Advanced",
+        key_topics: ["Multi-Touch Attribution (MTA)", "Blended vs Paid CAC", "ROAS Scaling Thresholds", "Incrementality Testing"],
+        estimated_study_hours: 6,
+      },
+      {
+        name: "Funnel Conversion Rate Optimization (CRO)",
+        description: "Diagnosing landing page drop-offs, multivariate A/B testing methodologies, and user journey friction analysis.",
+        difficulty: "Intermediate",
+        key_topics: ["Funnel Drop-Off Diagnostics", "A/B Test Statistical Significance", "Landing Page Velocity", "Activation Milestones"],
+        estimated_study_hours: 6,
+      },
+      {
+        name: "Audience Segmentation & Lifecycle Retention",
+        description: "Cohort retention analysis, behavioral segmentation, and personalized email/push reactivation workflows.",
+        difficulty: "Intermediate",
+        key_topics: ["Behavioral Segmentation", "Cohort LTV Curves", "Churn Mitigation", "Lifecycle Messaging Triggers"],
+        estimated_study_hours: 5,
+      },
+    ];
+
+    actionableSteps = [
+      "Run an experiment analysis simulating budget reallocation from low-ROAS channels to high-intent search and remarketing.",
+      "Design an A/B testing framework calculating minimum sample sizes and required lift for statistical significance.",
+    ];
+
+    retrievedSources = [
+      "marketing_knowledge://attribution_modeling_and_roas",
+      "marketing_knowledge://growth_funnel_conversion_mechanics",
+      "marketing_knowledge://audience_segmentation_lifecycle",
     ];
   } else {
-    curriculumTree = [
-      {
-        name: "Ensemble Learning & Variance Reduction",
-        description: "Random Forest bagging mechanics, bootstrap aggregation, and out-of-bag error estimation.",
-        difficulty: "Intermediate",
-        key_topics: ["Bootstrap Aggregation", "Variance vs Bias", "Feature Subsampling"],
-        estimated_study_hours: 5,
-      },
-      {
-        name: "Class Imbalance & Cost-Sensitive Loss",
-        description: "SMOTE synthetic generation vs decision threshold tuning and Focal Loss formulation.",
-        difficulty: "Intermediate",
-        key_topics: ["SMOTE Limitations", "PR-AUC vs ROC-AUC", "Focal Loss"],
-        estimated_study_hours: 6,
-      },
-      {
-        name: "Model Explainability & Game Theory",
-        description: "TreeSHAP vs KernelSHAP, local efficiency, and game-theoretic Shapley axioms.",
-        difficulty: "Advanced",
-        key_topics: ["Shapley Value Additivity", "Feature Attribution", "Interactions"],
-        estimated_study_hours: 6,
-      },
+    // Technical Department
+    let pythonScore = 92;
+    let mlScore = 87;
+    let sqlScore = 72;
+    let ragScore = 51;
+    let systemDesignScore = 43;
+
+    if (history.length > 0) {
+      history.forEach((t) => {
+        const text = `${t.question.toLowerCase()} ${t.answer.toLowerCase()}`;
+        const accuracy = t.breakdown?.technical_accuracy ?? t.score;
+
+        if (
+          text.includes("system design") ||
+          text.includes("concurrency") ||
+          text.includes("throughput") ||
+          text.includes("scale") ||
+          text.includes("kafka") ||
+          text.includes("streaming") ||
+          text.includes("tradeoff")
+        ) {
+          if (t.weakArea || accuracy < 70) {
+            systemDesignScore = Math.min(systemDesignScore, accuracy - 15);
+          } else {
+            systemDesignScore = Math.max(systemDesignScore, accuracy);
+          }
+        }
+
+        if (
+          text.includes("rag") ||
+          text.includes("retrieval") ||
+          text.includes("embedding") ||
+          text.includes("chroma") ||
+          text.includes("vector") ||
+          text.includes("chunk")
+        ) {
+          if (t.weakArea || accuracy < 70) {
+            ragScore = Math.min(ragScore, accuracy - 10);
+          } else {
+            ragScore = Math.max(ragScore, accuracy);
+          }
+        }
+
+        if (
+          text.includes("random forest") ||
+          text.includes("decision tree") ||
+          text.includes("shap") ||
+          text.includes("imbalance") ||
+          text.includes("smote") ||
+          text.includes("model") ||
+          text.includes("classification")
+        ) {
+          if (t.weakArea || accuracy < 70) {
+            mlScore = Math.min(mlScore, accuracy);
+          } else {
+            mlScore = Math.max(mlScore, accuracy);
+          }
+        }
+
+        if (
+          text.includes("python") ||
+          text.includes("gil") ||
+          text.includes("multiprocessing") ||
+          text.includes("asyncio") ||
+          text.includes("threading") ||
+          text.includes("decorator")
+        ) {
+          if (t.weakArea || accuracy < 70) {
+            pythonScore = Math.min(pythonScore, accuracy);
+          } else {
+            pythonScore = Math.max(pythonScore, accuracy);
+          }
+        }
+
+        if (
+          text.includes("sql") ||
+          text.includes("database") ||
+          text.includes("query") ||
+          text.includes("join") ||
+          text.includes("index") ||
+          text.includes("schema")
+        ) {
+          if (t.weakArea || accuracy < 70) {
+            sqlScore = Math.min(sqlScore, accuracy);
+          } else {
+            sqlScore = Math.max(sqlScore, accuracy);
+          }
+        }
+      });
+    }
+
+    pythonScore = Math.max(30, Math.min(98, pythonScore));
+    mlScore = Math.max(30, Math.min(98, mlScore));
+    sqlScore = Math.max(30, Math.min(98, sqlScore));
+    ragScore = Math.max(30, Math.min(98, ragScore));
+    systemDesignScore = Math.max(30, Math.min(98, systemDesignScore));
+
+    skills = [
+      { name: "Python", score: pythonScore, level: getLevel(pythonScore), category: "Programming" },
+      { name: "Machine Learning", score: mlScore, level: getLevel(mlScore), category: "AI & Algorithms" },
+      { name: "SQL & Data", score: sqlScore, level: getLevel(sqlScore), category: "Data Engineering" },
+      { name: "RAG & Vector Retrieval", score: ragScore, level: getLevel(ragScore), category: "Generative AI" },
+      { name: "System Design", score: systemDesignScore, level: getLevel(systemDesignScore), category: "Architecture" },
+      { name: "Communication", score: commScore, level: getLevel(commScore), category: "Non-Verbal & Delivery" },
     ];
 
-    actionableSteps = [
-      "Implement a custom Random Forest classifier in PyTorch/Scikit-Learn to master internal splits.",
-      "Calculate TreeSHAP values for an imbalanced fraud detection model.",
-    ];
+    const sorted = [...skills].sort((a, b) => a.score - b.score);
+    const lowest = sorted[0];
 
-    retrievedSources = [
-      "chroma://technical_knowledge/random_forest_ensemble_theory",
-      "chroma://technical_knowledge/shap_explainability_shapley_values",
-    ];
+    if (lowest.name === "System Design" || lowest.score <= 55) {
+      curriculumTree = [
+        {
+          name: "REST APIs & Protocol Architecture",
+          description: "API idempotency, HTTP status semantics, gRPC vs REST, and contract serialization.",
+          difficulty: "Foundational",
+          key_topics: ["Idempotency Keys", "HTTP Status 429/503", "gRPC Protobuf vs JSON", "Rate Limiting"],
+          estimated_study_hours: 4,
+        },
+        {
+          name: "Caching & In-Memory Stores",
+          description: "Redis caching patterns, cache-aside, write-through, and LRU/LFU eviction algorithms.",
+          difficulty: "Intermediate",
+          key_topics: ["Cache-Aside Pattern", "Cache Stampede Mitigation", "Redis Eviction Policies", "TTL Strategies"],
+          estimated_study_hours: 6,
+        },
+        {
+          name: "Databases & Horizontal Sharding",
+          description: "Relational vs NoSQL trade-offs, B-Tree index optimization, sharding keys, and replication lag.",
+          difficulty: "Intermediate",
+          key_topics: ["B-Tree vs LSM Trees", "Horizontal Sharding Keys", "Read Replicas", "ACID vs BASE"],
+          estimated_study_hours: 8,
+        },
+        {
+          name: "Message Queues & Event Streaming",
+          description: "Apache Kafka partition scalability, consumer group offset commits, and backpressure management.",
+          difficulty: "Advanced",
+          key_topics: ["Kafka Partition Strategy", "Consumer Offset Lag", "At-Least-Once Delivery", "Dead Letter Queues"],
+          estimated_study_hours: 8,
+        },
+      ];
+
+      actionableSteps = [
+        "Review the ChromaDB System Design Knowledge Collection for Kafka partition sizing and Redis caching rubrics.",
+        "Design an end-to-end distributed URL shortener or rate limiter handling 50k requests/second.",
+      ];
+
+      retrievedSources = [
+        "chroma://technical_knowledge/system_design_scalability_rubric",
+        "chroma://technical_knowledge/distributed_caching_redis_patterns",
+      ];
+    } else {
+      curriculumTree = [
+        {
+          name: "Ensemble Learning & Variance Reduction",
+          description: "Random Forest bagging mechanics, bootstrap aggregation, and out-of-bag error estimation.",
+          difficulty: "Intermediate",
+          key_topics: ["Bootstrap Aggregation", "Variance vs Bias", "Feature Subsampling"],
+          estimated_study_hours: 5,
+        },
+        {
+          name: "Class Imbalance & Cost-Sensitive Loss",
+          description: "SMOTE synthetic generation vs decision threshold tuning and Focal Loss formulation.",
+          difficulty: "Intermediate",
+          key_topics: ["SMOTE Limitations", "PR-AUC vs ROC-AUC", "Focal Loss"],
+          estimated_study_hours: 6,
+        },
+      ];
+
+      actionableSteps = [
+        "Implement a custom classifier to master internal splits and threshold tuning.",
+        "Benchmark precision-recall tradeoffs on an imbalanced classification problem.",
+      ];
+
+      retrievedSources = [
+        "chroma://technical_knowledge/random_forest_ensemble_theory",
+        "chroma://technical_knowledge/shap_explainability_shapley_values",
+      ];
+    }
   }
+
+  const sortedSkills = [...skills].sort((a, b) => a.score - b.score);
+  const lowestSkill = sortedSkills[0];
+  const highestPriorityArea = lowestSkill.name;
 
   return {
     skills,
@@ -815,7 +1194,7 @@ export function generateSkillGapReport(
     summary_statement: `Your highest-priority improvement area is ${highestPriorityArea}.`,
     study_plan: {
       priority_skill: highestPriorityArea,
-      priority_reason: `Lowest mastery score (${lowestSkill.score}/100) identified during technical evaluation.`,
+      priority_reason: `Lowest mastery score (${lowestSkill.score}/100) identified during evaluation.`,
       curriculum_tree: curriculumTree,
       actionable_steps: actionableSteps,
       retrieved_rag_sources: retrievedSources,
@@ -1325,6 +1704,7 @@ export interface StructuredProject {
 }
 
 export function extractStructuredProjects(text: string): StructuredProject[] {
+  if (!text || typeof text !== "string") return [];
   const projects: StructuredProject[] = [];
   const knownSkills = [
     "Random Forest",
@@ -1421,9 +1801,10 @@ export interface ConceptCatalogEntry {
 }
 
 export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
+  // --- Technical: Machine Learning & Distributed Systems ---
   {
     topicId: "random_forest_selection",
-    triggers: ["random forest", "decision tree", "ensemble", "bagging", "thyroid", "prediction", "classifier"],
+    triggers: ["random forest", "decision tree", "ensemble", "bagging", "classifier"],
     depthSignals: ["variance", "bias", "overfit", "bagging", "bootstrap", "subsampling", "features", "decorrelat", "gini", "depth", "split", "impurity", "trees"],
     weakArea: "Random Forest Model Selection & Overfitting Mitigation",
     concepts: ["Random Forest", "Decision Trees", "Bagging", "Feature Importance", "Overfitting", "Variance Reduction"],
@@ -1432,7 +1813,7 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
   {
     topicId: "class_imbalance",
-    triggers: ["imbalance", "skew", "smote", "focal loss", "precision", "recall", "rare", "fraud", "anomaly", "intrusion", "attack"],
+    triggers: ["imbalance", "skew", "smote", "focal loss", "precision", "recall"],
     depthSignals: ["smote", "focal loss", "pr-auc", "roc-auc", "recall", "precision", "resampling", "cost-sensitive", "threshold", "f1", "stratified"],
     weakArea: "Class Imbalance Handling & Metric Selection",
     concepts: ["Class Imbalance", "SMOTE", "Focal Loss", "PR-AUC", "Stratified Sampling", "Cost-Sensitive Learning"],
@@ -1441,7 +1822,7 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
   {
     topicId: "shap_interpretability",
-    triggers: ["shap", "shapley", "explain", "interpret", "black box", "xai", "importance", "feature attribution"],
+    triggers: ["shap", "shapley", "explainability", "black box", "xai", "feature attribution"],
     depthSignals: ["shapley", "game theory", "coalition", "local", "global", "marginal", "treeshap", "attribution", "efficiency", "additivity"],
     weakArea: "Model Explainability & SHAP Values",
     concepts: ["SHAP", "Shapley Values", "Feature Attributions", "Local Interpretability", "TreeSHAP"],
@@ -1450,7 +1831,7 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
   {
     topicId: "rag_vector_search",
-    triggers: ["rag", "vector", "chroma", "embedding", "retrieval", "chunking", "semantic", "llm"],
+    triggers: ["rag", "vector search", "chroma", "embedding", "chunking strategy", "semantic retrieval"],
     depthSignals: ["embedding", "cosine", "similarity", "chunk", "overlap", "rerank", "dense", "sparse", "hallucination", "context window", "hybrid search"],
     weakArea: "RAG Retrieval Architecture & Vector Chunking",
     concepts: ["Vector Embeddings", "Cosine Distance", "Semantic Chunking", "Reranking", "Hallucination Reduction"],
@@ -1459,7 +1840,7 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
   {
     topicId: "python_gil_concurrency",
-    triggers: ["gil", "concurrency", "multiprocessing", "asyncio", "threading", "generator", "yield", "python"],
+    triggers: ["gil", "python concurrency", "multiprocessing versus asyncio", "thread safe", "python interpreter lock"],
     depthSignals: ["gil", "bytecode", "interpreter lock", "cpu-bound", "i/o-bound", "event loop", "memory", "lazy", "iterator", "process pool"],
     weakArea: "Python GIL & Concurrency Paradigms",
     concepts: ["GIL", "Multiprocessing vs Asyncio", "Generators", "Memory Footprint", "Event Loop"],
@@ -1468,19 +1849,107 @@ export const CONCEPT_CATALOG: ConceptCatalogEntry[] = [
   },
   {
     topicId: "system_design_kafka",
-    triggers: ["system design", "kafka", "streaming", "throughput", "scalable", "pipeline", "queue", "architecture"],
+    triggers: ["system design", "kafka", "streaming architecture", "throughput", "message queue", "sharding"],
     depthSignals: ["partition", "backpressure", "consumer group", "idempotent", "at-least-once", "offset", "replication", "sharding", "cache"],
     weakArea: "Streaming Systems & Backpressure Architecture",
     concepts: ["Kafka Partitioning", "Backpressure", "Consumer Groups", "Idempotency", "Database Sharding"],
     probingQuestion: "When designing a real-time ingestion pipeline handling 50k events/sec, how do Kafka partitions and consumer group offsets prevent data loss and backpressure bottlenecks?",
     advancedQuestion: "How would you ensure end-to-end exactly-once processing (EOS) semantics across a distributed streaming architecture during node failures?",
   },
+
+  // --- Finance Department ---
+  {
+    topicId: "finance_dcf_valuation",
+    triggers: ["dcf", "discounted cash flow", "valuation", "wacc", "terminal value", "free cash flow", "discount rate"],
+    depthSignals: ["wacc", "terminal value", "free cash flow", "discount rate", "growth rate", "capm", "beta", "sensitivity", "debt", "equity", "perpetuity", "gordon"],
+    weakArea: "DCF Valuation Modeling & WACC Estimation",
+    concepts: ["DCF Valuation", "Free Cash Flow", "WACC", "Terminal Value", "Sensitivity Analysis", "CAPM"],
+    probingQuestion: "In your DCF valuation, how did you determine the terminal value growth rate and estimate the cost of equity using CAPM?",
+    advancedQuestion: "How would you run a multi-variable Monte Carlo sensitivity simulation on your DCF model to assess valuation ranges under macroeconomic interest rate shocks?",
+  },
+  {
+    topicId: "finance_financial_statements",
+    triggers: ["income statement", "balance sheet", "cash flow", "liquidity", "solvency", "profitability", "ebitda", "working capital", "reconciliation"],
+    depthSignals: ["operating cash flow", "working capital", "depreciation", "amortization", "accruals", "liquidity", "current ratio", "solvency", "leverage", "non-cash"],
+    weakArea: "Financial Statement Synthesis & Working Capital Analysis",
+    concepts: ["Three-Statement Modeling", "Cash Conversion Cycle", "Working Capital", "Liquidity Ratios", "EBITDA Reconciliation"],
+    probingQuestion: "If a company reports rising net income but declining cash flow from operations, what line items on the balance sheet and cash flow statement would you investigate first?",
+    advancedQuestion: "How do changes in revenue recognition under ASC 606 / IFRS 15 impact working capital metrics and cash conversion cycle volatility?",
+  },
+  {
+    topicId: "finance_budgeting_variance",
+    triggers: ["budget", "forecast", "variance", "p&l", "margin", "revenue decline", "cost driver", "fp&a", "opex", "capex"],
+    depthSignals: ["volume", "price", "mix", "opex", "capex", "variance analysis", "rolling forecast", "headcount", "fixed cost", "variable cost", "run rate"],
+    weakArea: "Financial Variance Decomposition & Rolling Forecasts",
+    concepts: ["Volume-Price-Mix Variance", "Rolling Forecasts", "Operating Margins", "CapEx vs OpEx", "Cost Drivers"],
+    probingQuestion: "When a business unit misses its quarterly operating margin target, how do you isolate volume, price, and mix variances from uncontrollable cost inflation?",
+    advancedQuestion: "How do you construct dynamic driver-based financial models that automatically re-forecast cash runway during sudden revenue contraction?",
+  },
+
+  // --- HR Department ---
+  {
+    topicId: "hr_retention_attrition",
+    triggers: ["retention", "attrition", "turnover", "quit", "exit interview", "stay interview", "retention strategy", "resignation"],
+    depthSignals: ["voluntary attrition", "involuntary", "exit interview", "enps", "stay interview", "career progression", "manager effectiveness", "benchmarking", "compensation"],
+    weakArea: "Voluntary Attrition Diagnostics & Retention Architecture",
+    concepts: ["Attrition Root-Cause Analysis", "Stay Interviews", "eNPS", "Flight Risk Modeling", "Retention Incentives"],
+    probingQuestion: "How would you design a data-driven diagnostic framework to determine whether voluntary turnover in a critical team is driven by compensation, burnout, or managerial misalignment?",
+    advancedQuestion: "How do you build predictive early-warning flight risk indicators combining engagement survey sentiment, tenure milestones, and promotion latency?",
+  },
+  {
+    topicId: "hr_talent_acquisition",
+    triggers: ["recruit", "talent acquisition", "sourcing", "hiring funnel", "time-to-fill", "offer acceptance", "candidate experience", "job post"],
+    depthSignals: ["time-to-fill", "offer acceptance rate", "pass-through rate", "pipeline", "sourcing channel", "diversity", "hiring manager alignment", "candidate quality"],
+    weakArea: "Talent Acquisition Funnel Efficiency & Sourcing Strategy",
+    concepts: ["Funnel Conversion Rates", "Time-to-Hire", "Sourcing Optimization", "Offer Acceptance Strategy", "Structured Interviewing"],
+    probingQuestion: "If time-to-fill is increasing while candidate offer acceptance rates drop below 70%, what funnel bottlenecks and compensation benchmarks would you analyze first?",
+    advancedQuestion: "How do you calibrate structured competencies and scorecards across hiring panels to eliminate interviewer bias and elevate bar-raiser consistency?",
+  },
+  {
+    topicId: "hr_performance_employee_relations",
+    triggers: ["performance management", "employee relations", "conflict", "pip", "dispute", "investigation", "culture", "review", "feedback"],
+    depthSignals: ["performance improvement plan", "documentation", "mediation", "progressive discipline", "fairness", "confidentiality", "compliance", "retaliation"],
+    weakArea: "Performance Management Governance & Employee Relations",
+    concepts: ["Progressive Discipline", "Objective Documentation", "Conflict Mediation", "PIP Design", "Employment Compliance"],
+    probingQuestion: "When a manager wants to initiate an immediate performance improvement plan for an employee claiming interpersonal conflict, how do you investigate objectively while mitigating organizational risk?",
+    advancedQuestion: "How do you design a holistic, calibrated performance review cycle that aligns individual goals with organizational OKRs without encouraging sandbagging?",
+  },
+
+  // --- Marketing Department ---
+  {
+    topicId: "marketing_campaign_roas",
+    triggers: ["campaign", "roas", "ad spend", "paid media", "channel", "budget allocation", "cpc", "cpm", "paid search", "paid social"],
+    depthSignals: ["roas", "cpc", "cpm", "marginal returns", "creative fatigue", "audience saturation", "conversion rate", "bidding strategy", "blended"],
+    weakArea: "Paid Media Channel Economics & ROAS Optimization",
+    concepts: ["Return on Ad Spend (ROAS)", "Marginal CAC", "Creative Fatigue", "Bidding Strategies", "Channel Allocation"],
+    probingQuestion: "When scaling a paid acquisition campaign leads to diminishing returns and falling ROAS, how do you diagnose whether the issue is audience saturation, ad fatigue, or bidding inefficiency?",
+    advancedQuestion: "How do you calibrate incrementality testing (e.g. geo-lift experiments or conversion lift) against reported platform attribution to eliminate ad network double-counting?",
+  },
+  {
+    topicId: "marketing_funnel_conversion",
+    triggers: ["cac", "conversion rate", "funnel", "landing page", "a/b test", "bounce rate", "trial", "lead", "signup"],
+    depthSignals: ["cac", "ltv", "conversion rate", "micro-conversion", "landing page", "hypothesis", "significance", "onboarding", "activation", "drop-off"],
+    weakArea: "Conversion Rate Optimization (CRO) & Funnel Diagnostics",
+    concepts: ["Funnel Drop-Off Analysis", "A/B Testing Rigor", "Customer Acquisition Cost", "Micro-Conversions", "Lead Qualification"],
+    probingQuestion: "If top-of-funnel campaign traffic is up 40% but trial-to-paid conversion has declined by 20%, what diagnostic steps would you take to identify the conversion leak?",
+    advancedQuestion: "How do you structure multivariate testing protocols to maintain statistical power and avoid false discoveries when optimizing high-traffic checkout funnels?",
+  },
+  {
+    topicId: "marketing_attribution_retention",
+    triggers: ["attribution", "ltv", "churn", "retention", "cohort", "multi-touch", "crm", "lifecycle", "email marketing", "customer journey"],
+    depthSignals: ["multi-touch attribution", "first-touch", "last-touch", "shapley attribution", "linear", "time-decay", "cohort analysis", "churn rate", "ltv:cac"],
+    weakArea: "Multi-Touch Attribution Modeling & Customer LTV Analytics",
+    concepts: ["Multi-Touch Attribution", "Cohort Retention Curves", "LTV:CAC Ratio", "Lifecycle Messaging", "Payback Period"],
+    probingQuestion: "How do you evaluate the tradeoffs between first-touch, last-touch, and data-driven multi-touch attribution models when determining budget allocation between brand awareness and direct conversion?",
+    advancedQuestion: "How would you design a cohort-based retention model to calculate Net Revenue Retention (NRR) and identify the inflection point where payback period becomes cash-flow positive?",
+  },
 ];
 
 export function diagnoseTechnicalDepth(
   question: string,
   answer: string,
-  keywords: string[] = []
+  keywords: string[] = [],
+  departmentId: DepartmentId = "Technical"
 ): {
   weakArea: string | null;
   retrievedConcepts: string[];
@@ -1492,27 +1961,78 @@ export function diagnoseTechnicalDepth(
   const words = normA.match(/[a-z0-9+#.-]+/g) ?? [];
   const wordCount = words.length;
 
-  let matchedEntry = CONCEPT_CATALOG.find((entry) =>
-    entry.triggers.some((trigger) => normQ.includes(trigger))
-  );
+  // 1. Try to find matching concept entry that aligns with the question and department
+  let matchedEntry = CONCEPT_CATALOG.find((entry) => {
+    const matchesTrigger = entry.triggers.some((trigger) => normQ.includes(trigger));
+    if (!matchesTrigger) return false;
+    // Check department compatibility
+    if (departmentId !== "Technical") {
+      return !UNRELATED_TECHNICAL_JARGON.some((j) => entry.weakArea.toLowerCase().includes(j));
+    }
+    return true;
+  });
 
   if (!matchedEntry && keywords.length > 0) {
     const kwStr = keywords.join(" ").toLowerCase();
-    matchedEntry = CONCEPT_CATALOG.find((entry) =>
-      entry.triggers.some((trigger) => kwStr.includes(trigger))
-    );
+    matchedEntry = CONCEPT_CATALOG.find((entry) => {
+      const matchesKw = entry.triggers.some((trigger) => kwStr.includes(trigger));
+      if (!matchesKw) return false;
+      if (departmentId !== "Technical") {
+        return !UNRELATED_TECHNICAL_JARGON.some((j) => entry.weakArea.toLowerCase().includes(j));
+      }
+      return true;
+    });
   }
 
+  // 2. Department-specific safe fallback entry (never falls back to general_engineering for non-technical roles)
   if (!matchedEntry) {
-    matchedEntry = {
-      topicId: "general_engineering",
-      triggers: [],
-      depthSignals: ["tradeoff", "complexity", "scalability", "latency", "bottleneck", "architecture", "optimization", "monitoring"],
-      weakArea: "Technical Architecture & Tradeoff Analysis",
-      concepts: ["Tradeoff Analysis", "System Scalability", "Performance Optimization", "Failure Recovery"],
-      probingQuestion: "Can you elaborate on the specific architectural tradeoffs and failure modes you considered in this approach?",
-      advancedQuestion: "How would you measure the performance impact and reliability of this solution under 10x production load?",
-    };
+    switch (departmentId) {
+      case "Finance":
+        matchedEntry = {
+          topicId: "general_finance",
+          triggers: [],
+          depthSignals: ["valuation", "cash flow", "margin", "forecast", "ebitda", "variance", "capital", "revenue", "cost", "ratio", "compliance"],
+          weakArea: "Financial Analysis & Strategic Planning",
+          concepts: ["Financial Modeling", "Cash Flow Analysis", "Risk Assessment", "Variance Diagnostics"],
+          probingQuestion: "Can you elaborate on the core financial assumptions, risk factors, and valuation metrics that support your recommendation?",
+          advancedQuestion: "How would you stress-test this financial recommendation against simultaneous inflationary cost pressures and declining demand?",
+        };
+        break;
+      case "HR":
+        matchedEntry = {
+          topicId: "general_hr",
+          triggers: [],
+          depthSignals: ["retention", "attrition", "engagement", "hiring", "compensation", "culture", "talent", "onboarding", "policy", "relations"],
+          weakArea: "Strategic Human Resources & Organizational Development",
+          concepts: ["Talent Management", "Workforce Strategy", "Employee Engagement", "Policy Governance"],
+          probingQuestion: "How would you structure the change management process, align executive leadership, and measure the long-term retention impact of this initiative?",
+          advancedQuestion: "How do you design scalable people operations frameworks that preserve organizational culture during rapid multi-regional expansion?",
+        };
+        break;
+      case "Marketing":
+        matchedEntry = {
+          topicId: "general_marketing",
+          triggers: [],
+          depthSignals: ["campaign", "conversion", "cac", "roas", "channel", "attribution", "funnel", "audience", "retention", "ltv", "brand"],
+          weakArea: "Strategic Growth Marketing & Performance Measurement",
+          concepts: ["Growth Strategy", "Customer Acquisition", "Funnel Analytics", "Brand Performance"],
+          probingQuestion: "What key performance indicators and customer segmentation insights would you use to validate the sustainable ROI of this approach?",
+          advancedQuestion: "How do you reallocate marketing capital between upper-funnel brand awareness and bottom-funnel performance marketing under changing consumer sentiment?",
+        };
+        break;
+      case "Technical":
+      default:
+        matchedEntry = {
+          topicId: "general_engineering",
+          triggers: [],
+          depthSignals: ["tradeoff", "complexity", "scalability", "latency", "bottleneck", "architecture", "optimization", "monitoring"],
+          weakArea: "Technical Architecture & Tradeoff Analysis",
+          concepts: ["Tradeoff Analysis", "System Scalability", "Performance Optimization", "Failure Recovery"],
+          probingQuestion: "Can you elaborate on the specific architectural tradeoffs and failure modes you considered in this approach?",
+          advancedQuestion: "How would you measure the performance impact and reliability of this solution under 10x production load?",
+        };
+        break;
+    }
   }
 
   const depthHits = matchedEntry.depthSignals.filter((sig) => normA.includes(sig)).length;
@@ -1529,7 +2049,6 @@ export function diagnoseTechnicalDepth(
     };
   }
 
-  // Dynamic realistic technical depth scoring
   let baseDepth = 65;
   if (wordCount >= 15) baseDepth += 5;
   if (wordCount >= 35) baseDepth += 7;
@@ -1545,7 +2064,7 @@ export function diagnoseTechnicalDepth(
       weakArea: matchedEntry.weakArea,
       retrievedConcepts: matchedEntry.concepts,
       depthScore,
-      adaptiveStrategy: "Probing Weak Area via RAG Retrieval",
+      adaptiveStrategy: `Probing Weak Area: ${matchedEntry.weakArea}`,
     };
   }
 
@@ -1566,74 +2085,151 @@ export function generateQuestion(
   memory?: InterviewerMemory
 ): string {
   const effectiveDifficulty = targetDifficulty ?? profile.difficulty;
+  const departmentId: DepartmentId = (["Technical", "Finance", "HR", "Marketing"].includes(profile.department)
+    ? profile.department
+    : "Technical") as DepartmentId;
+  const targetRole = profile.targetRole || getDefaultRoleForDepartment(departmentId);
+  const safeTrack = isTrackAvailableForDepartment(departmentId, profile.domain)
+    ? profile.domain
+    : getDefaultTrackForDepartment(departmentId);
+  const roleQuestions = getQuestionsForSelection(departmentId, targetRole, safeTrack);
+
+  // 1. Coding & System Design Mode Guard (ONLY Technical roles can enter Coding or System Design)
+  if (departmentId === "Technical") {
+    if (profile.interviewType === "Coding") {
+      const p = CODING_PROBLEMS[turnIndex % CODING_PROBLEMS.length];
+      return `[Coding Challenge: ${p.title}] - ${p.description.split("\n\n")[0]} Implement your solution in the code editor, test assertions, and explain your approach and algorithmic complexity tradeoffs.`;
+    }
+    if (profile.interviewType === "System Design") {
+      const challenge = SYSTEM_DESIGN_CHALLENGES[turnIndex % SYSTEM_DESIGN_CHALLENGES.length];
+      return `[System Design Challenge: ${challenge.title}] - ${challenge.prompt} Draw your architecture on the whiteboard canvas, connect data flow tiers, and explain your strategy for scaling to ${challenge.targetScale}.`;
+    }
+  }
+
+  // 2. Turn 0: Project Grounding (STRICT: only if project is demonstrably relevant to selected department and role!)
   const projects = extractStructuredProjects(profile.resumeText);
+  const relevantProjects = projects.filter((p) => isProjectRelevantToRole(p, departmentId, targetRole));
 
-  // Coding Mode: Load interactive algorithmic problems
-  if (profile.interviewType === "Coding") {
-    const p = CODING_PROBLEMS[turnIndex % CODING_PROBLEMS.length];
-    return `[Coding Challenge: ${p.title}] - ${p.description.split("\n\n")[0]} Implement your solution in the code editor, test assertions, and explain your approach and algorithmic complexity tradeoffs.`;
-  }
-
-  // System Design Mode: Load interactive architectural challenges
-  if (profile.interviewType === "System Design") {
-    const challenge = SYSTEM_DESIGN_CHALLENGES[turnIndex % SYSTEM_DESIGN_CHALLENGES.length];
-    return `[System Design Challenge: ${challenge.title}] - ${challenge.prompt} Draw your architecture on the whiteboard canvas, connect data flow tiers, and explain your strategy for scaling to ${challenge.targetScale}.`;
-  }
-
-  // 1. First question: Domain-tailored challenge grounded in candidate's project
-  if (turnIndex === 0 && projects.length > 0) {
-    const proj = projects[0];
+  if (turnIndex === 0 && relevantProjects.length > 0) {
+    const proj = relevantProjects[0];
     const titleLower = proj.title.toLowerCase();
 
-    // Domain 1: Medical / Disease Prediction
+    if (departmentId === "Finance") {
+      if (["valuation", "dcf", "m&a", "equity", "investment", "lbo", "discounted"].some((w) => titleLower.includes(w))) {
+        return `You mentioned working on ${proj.title} in your background. How did you structure your discounted cash flow valuation assumptions, and how did you estimate your cost of capital?`;
+      }
+      if (["statement", "close", "audit", "reconciliation", "accounting"].some((w) => titleLower.includes(w))) {
+        return `In your ${proj.title} project, how did you reconcile accounting discrepancies and verify that reported revenue matched cash collection?`;
+      }
+      return `You mentioned working on ${proj.title} in your financial experience. What were the key assumptions in your financial model, and how did you stress-test them under macroeconomic volatility?`;
+    }
+
+    if (departmentId === "HR") {
+      if (["retention", "attrition", "turnover", "stay"].some((w) => titleLower.includes(w))) {
+        return `In your ${proj.title} project, how did you diagnose voluntary attrition patterns, and what interventions had the greatest impact on employee retention?`;
+      }
+      if (["recruit", "sourcing", "talent", "hiring"].some((w) => titleLower.includes(w))) {
+        return `You highlighted your ${proj.title} initiative. How did you optimize your talent acquisition funnel and balance time-to-fill with quality-of-hire?`;
+      }
+      return `In your ${proj.title} initiative, how did you measure stakeholder alignment and evaluate the long-term impact on organizational culture?`;
+    }
+
+    if (departmentId === "Marketing") {
+      if (["campaign", "roas", "ad spend", "paid"].some((w) => titleLower.includes(w))) {
+        return `In your ${proj.title} project, how did you track multi-channel attribution and optimize return on ad spend (ROAS) across paid channels?`;
+      }
+      if (["conversion", "funnel", "landing page", "cro", "a/b"].some((w) => titleLower.includes(w))) {
+        return `You mentioned working on ${proj.title}. How did you prioritize hypothesis testing to improve conversion rates across the customer acquisition funnel?`;
+      }
+      return `In your ${proj.title} campaign, how did you define your target customer segmentation and measure customer lifetime value (LTV)?`;
+    }
+
+    // Technical Department Project Questions
     if (["thyroid", "disease", "cancer", "medical", "patient", "clinical", "health"].some((w) => titleLower.includes(w))) {
       return `You mentioned using ${proj.primarySkill} in your ${proj.title.toLowerCase()} project. How did you handle class imbalance, and why did you choose ${proj.primarySkill} over alternative models?`;
     }
-
-    // Domain 2: Fraud / Intrusion / Anomaly Detection
     if (["intrusion", "fraud", "anomaly", "detection", "cyber", "security"].some((w) => titleLower.includes(w))) {
       return `You mentioned using ${proj.primarySkill} in your ${proj.title} project. Given the extreme class imbalance in anomaly traffic, how did you handle skewed data distribution and validate model recall?`;
     }
-
-    // Domain 3: RAG / LLM / NLP Applications
     if (["rag", "llm", "chatbot", "gpt", "retrieval", "nlp", "semantic"].some((w) => titleLower.includes(w))) {
       return `You mentioned developing ${proj.title} using ${proj.primarySkill}. How did you structure your vector chunking strategy, and how did you minimize hallucination in retrieved context?`;
     }
-
-    // Domain 4: General ML / Classification
     if (proj.category === "ml_model") {
       return `You mentioned using ${proj.primarySkill} in your ${proj.title.toLowerCase()} project. How did you handle data preprocessing and class imbalance, and why did you choose ${proj.primarySkill} over alternative models?`;
     }
-
-    // Domain 5: System / Backend / Microservices
     return `You mentioned developing ${proj.title} using ${proj.primarySkill}. What were the primary architectural tradeoffs you made regarding concurrency, data consistency, and error recovery?`;
   }
 
-  // 2. Genuine Adaptive Follow-up: If previous turn revealed weak conceptual depth, drill down via RAG
+  // 3. Adaptive Follow-up: If previous turn revealed weak conceptual depth, drill down within the candidate's exact role
   if (lastTurn && lastTurn.weakArea) {
-    if (lastTurn.weakArea.includes("Random Forest")) {
-      return "How does Random Forest reduce overfitting compared with a single decision tree?";
+    const isWeakAreaRelevant = validateQuestionRelevance(lastTurn.weakArea, departmentId, targetRole);
+
+    if (isWeakAreaRelevant) {
+      if (departmentId === "Finance") {
+        if (lastTurn.weakArea.includes("DCF") || lastTurn.weakArea.includes("Valuation")) {
+          return "How does changes in the Weighted Average Cost of Capital (WACC) impact the sensitivity of your DCF terminal value calculation?";
+        }
+        if (lastTurn.weakArea.includes("Financial Statement") || lastTurn.weakArea.includes("Working Capital")) {
+          return "Which liquidity and solvency ratios would you analyze to determine if a company with positive EBITDA is approaching a cash insolvency crisis?";
+        }
+        if (lastTurn.weakArea.includes("Variance") || lastTurn.weakArea.includes("Forecast")) {
+          return "When revenue misses the forecast by 8%, how would you isolate whether the decline was driven by sales volume, price realization, or product mix?";
+        }
+        return `Can you elaborate on how you evaluate the financial tradeoffs, assumptions, and risk factors associated with ${lastTurn.weakArea}?`;
+      }
+
+      if (departmentId === "HR") {
+        if (lastTurn.weakArea.includes("Attrition") || lastTurn.weakArea.includes("Retention")) {
+          return "How do you evaluate exit interview data alongside quarterly engagement pulse surveys to separate compensation concerns from managerial dissatisfaction?";
+        }
+        if (lastTurn.weakArea.includes("Talent") || lastTurn.weakArea.includes("Sourcing")) {
+          return "If your candidate drop-off rate spikes between the first interview and final offer stage, how would you diagnose and fix the funnel bottleneck?";
+        }
+        if (lastTurn.weakArea.includes("Performance") || lastTurn.weakArea.includes("Relations")) {
+          return "How do you ensure documentation in a performance improvement plan (PIP) is sufficiently objective, measurable, and defensible?";
+        }
+        return `Can you explain the stakeholder alignment and policy framework you would use when addressing ${lastTurn.weakArea}?`;
+      }
+
+      if (departmentId === "Marketing") {
+        if (lastTurn.weakArea.includes("ROAS") || lastTurn.weakArea.includes("Paid Media")) {
+          return "When scaling ad budget, at what point do you recognize diminishing marginal ROAS, and how do you reallocate budget across discovery versus retargeting channels?";
+        }
+        if (lastTurn.weakArea.includes("Conversion") || lastTurn.weakArea.includes("Funnel")) {
+          return "If a landing page test increases click-through rates by 25% but trial-to-paid conversion drops, what underlying friction does that indicate in the funnel?";
+        }
+        if (lastTurn.weakArea.includes("Attribution") || lastTurn.weakArea.includes("LTV")) {
+          return "How do you resolve attribution disputes between your organic search (SEO) channel and paid search brand campaigns when both claim the final conversion?";
+        }
+        return `How do you measure and report the return on investment and customer retention impact for ${lastTurn.weakArea}?`;
+      }
+
+      if (departmentId === "Technical") {
+        if (lastTurn.weakArea.includes("Random Forest")) {
+          return "How does Random Forest reduce overfitting compared with a single decision tree?";
+        }
+        if (lastTurn.weakArea.includes("Class Imbalance")) {
+          return "In severe class imbalance, why is standard accuracy misleading, and how would you compare SMOTE versus adjusting the classification decision threshold or using Focal Loss?";
+        }
+        if (lastTurn.weakArea.includes("Explainability") || lastTurn.weakArea.includes("SHAP")) {
+          return "How does SHAP compute feature attributions based on game-theoretic Shapley values, and how does it provide local versus global interpretability?";
+        }
+        if (lastTurn.weakArea.includes("RAG")) {
+          return "How do chunk size and semantic boundary overlap affect retrieval accuracy in RAG, and how do you prevent context degradation?";
+        }
+        if (lastTurn.weakArea.includes("GIL") || lastTurn.weakArea.includes("Python")) {
+          return "Why does multi-threading fail to speed up CPU-bound ML tasks in Python, and when should you use multiprocessing versus asyncio?";
+        }
+        if (lastTurn.weakArea.includes("Streaming") || lastTurn.weakArea.includes("Kafka")) {
+          return "When designing a real-time ingestion pipeline handling 50k events/sec, how do Kafka partitions and consumer group offsets prevent backpressure bottlenecks?";
+        }
+        return `Can you drill down into the core technical mechanism for ${lastTurn.weakArea}: specifically the algorithmic tradeoffs and edge cases?`;
+      }
     }
-    if (lastTurn.weakArea.includes("Class Imbalance")) {
-      return "In severe class imbalance, why is standard accuracy misleading, and how would you compare SMOTE versus adjusting the classification decision threshold or using Focal Loss?";
-    }
-    if (lastTurn.weakArea.includes("Explainability") || lastTurn.weakArea.includes("SHAP")) {
-      return "How does SHAP compute feature attributions based on game-theoretic Shapley values, and how does it provide local versus global interpretability?";
-    }
-    if (lastTurn.weakArea.includes("RAG")) {
-      return "How do chunk size and semantic boundary overlap affect retrieval accuracy in RAG, and how do you prevent context degradation?";
-    }
-    if (lastTurn.weakArea.includes("GIL") || lastTurn.weakArea.includes("Python")) {
-      return "Why does multi-threading fail to speed up CPU-bound ML tasks in Python, and when should you use multiprocessing versus asyncio?";
-    }
-    if (lastTurn.weakArea.includes("Streaming") || lastTurn.weakArea.includes("Kafka")) {
-      return "When designing a real-time ingestion pipeline handling 50k events/sec, how do Kafka partitions and consumer group offsets prevent backpressure bottlenecks?";
-    }
-    return `Can you drill down into the core technical mechanism for ${lastTurn.weakArea}: specifically the algorithmic tradeoffs and edge cases?`;
   }
 
-  // 2.5 Digital Profile Grounding: Probe previously identified growth areas from persistent profile
-  if (profile.digitalProfile && (turnIndex === 1 || turnIndex === 2) && (!lastTurn || !lastTurn.weakArea)) {
+  // 4. Digital Profile Grounding: Probe previously identified growth areas ONLY if relevant to current role
+  if (departmentId === "Technical" && profile.digitalProfile && (turnIndex === 1 || turnIndex === 2) && (!lastTurn || !lastTurn.weakArea)) {
     const techSkills = Object.values(profile.digitalProfile.pillars.technical.skills);
     const weakSkill = techSkills.find((s) => s.score < 75);
     if (weakSkill) {
@@ -1649,15 +2245,17 @@ export function generateQuestion(
     }
   }
 
-  // 3. Memory Recall & Candidate Claim Callback (Interviewer recalls statements from earlier turns)
-  if (memory && memory.followups_pending.length > 0 && (turnIndex === 2 || turnIndex === 3) && (!lastTurn || !lastTurn.weakArea)) {
+  // 5. Memory Recall: Ensure pending callbacks are strictly validated against department
+  if (memory && (memory.followups_pending ?? []).length > 0 && (turnIndex === 2 || turnIndex === 3) && (!lastTurn || !lastTurn.weakArea)) {
     const callbackQ = memory.followups_pending[0];
-    return callbackQ;
+    if (validateQuestionRelevance(callbackQ, departmentId, targetRole)) {
+      return callbackQ;
+    }
   }
 
-  // 4. Dynamic Difficulty Progression (Warmup -> Standard -> Senior)
-  if (projects.length > 0 && profile.domain !== "DSA") {
-    const p = projects[turnIndex % projects.length];
+  // 6. Dynamic Difficulty Progression grounded in relevant projects (Technical roles only)
+  if (departmentId === "Technical" && relevantProjects.length > 0 && profile.domain !== "DSA") {
+    const p = relevantProjects[turnIndex % relevantProjects.length];
     const { title, primarySkill, skills } = p;
     const skillsList = skills.length > 0 ? skills.slice(0, 3).join(", ") : primarySkill;
 
@@ -1708,21 +2306,16 @@ export function generateQuestion(
     }
   }
 
-  // 4. Fallback to domain and role database curriculum
-  const anchor = keywords[turnIndex % Math.max(keywords.length, 1)] ?? profile.targetRole;
-  const safeTrack = isTrackAvailableForDepartment(profile.department, profile.domain)
-    ? profile.domain
-    : "Role Specific";
-  const roleQuestions = getQuestionsForSelection(profile.department, profile.targetRole, safeTrack);
+  // 7. Role Database Curriculum with Department-Calibrated Difficulty
   const baseQuestion =
     roleQuestions[turnIndex % Math.max(roleQuestions.length, 1)] ??
-    `What makes you a strong fit for ${profile.targetRole}?`;
+    `What makes you a strong fit for ${targetRole}?`;
 
-  let finalQuestion = baseQuestion;
-  if (effectiveDifficulty === "Senior") {
-    finalQuestion = `${baseQuestion} Include high-scale tradeoffs, distributed failure modes, and success metrics.`;
-  } else if (effectiveDifficulty === "Warmup") {
-    finalQuestion = `${baseQuestion} Keep the answer concise, practical, and focused on core concepts.`;
+  let finalQuestion = applyRoleAppropriateDifficulty(baseQuestion, departmentId, targetRole, effectiveDifficulty);
+
+  // Guard: Final relevance validation gate
+  if (!validateQuestionRelevance(finalQuestion, departmentId, targetRole)) {
+    finalQuestion = roleQuestions[0] ?? `How do you approach your core responsibilities as a ${targetRole}?`;
   }
 
   // Apply Interviewer Persona tone and framing
@@ -1746,7 +2339,9 @@ export function scoreAnswer(
   prevMemory: InterviewerMemory = { claims: [], skills_demonstrated: [], weak_topics: [], strong_topics: [], followups_pending: [], conflicts: [] },
   historyAnswers: Array<{ answer: string; turnId: number }> = [],
   currentTurnId = 1,
-  bodyLanguageStats?: BodyLanguageTurnStats
+  bodyLanguageStats?: BodyLanguageTurnStats,
+  departmentId?: DepartmentId,
+  targetRole?: string
 ) {
   const normalized = answer.toLowerCase();
   const words: string[] = normalized.match(/[a-z0-9+#.]+/g) ?? [];
@@ -1765,7 +2360,8 @@ export function scoreAnswer(
   const { weakArea, retrievedConcepts, depthScore, adaptiveStrategy } = diagnoseTechnicalDepth(
     question,
     answer,
-    keywords
+    keywords,
+    departmentId
   );
 
   let voicePace = voiceSignal.pace || 80;
@@ -1895,7 +2491,7 @@ export function scoreAnswer(
     conflicts: updatedMemory.conflicts,
     structureAnalysis,
     skillGapReport: generateSkillGapReport(
-      historyAnswers.map((h, i) => ({
+      (Array.isArray(historyAnswers) ? historyAnswers : []).map((h, i) => ({
         id: h.turnId,
         question: "",
         answer: h.answer,
@@ -1911,7 +2507,9 @@ export function scoreAnswer(
           voice,
           eyeContact: eye_contact,
         },
-      }))
+      })),
+      targetRole,
+      departmentId
     ),
     roadmap: generate7DayRoadmap(
       historyAnswers.map((h, i) => ({
@@ -1931,7 +2529,9 @@ export function scoreAnswer(
           voice,
           eyeContact: eye_contact,
         },
-      }))
+      })),
+      targetRole,
+      departmentId
     ),
     ragContextSummary: weakArea ? `Retrieved RAG rubrics from ChromaDB: ${retrievedConcepts.join(", ")}` : null,
     signals: {

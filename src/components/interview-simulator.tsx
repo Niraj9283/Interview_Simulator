@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Code2,
   Cpu,
@@ -179,6 +180,17 @@ const initialProfile: CandidateProfile = {
     "Project: Thyroid Disease Prediction using Random Forest, SHAP, and Streamlit, handling severe class imbalance.\nProject: Network Intrusion Detection System using Python, XGBoost, and Scikit-Learn for anomaly classification.\nSkills: Python, Random Forest, SHAP, Machine Learning, Deep Learning, SQL, FastAPI, Docker, PyTorch.",
 };
 
+const DEFAULT_SAMPLE_RESUMES: Record<DepartmentId, string> = {
+  Technical:
+    "Project: Distributed Real-Time Ingestion Pipeline using Go, Kafka, and PostgreSQL.\nProject: Microservices Rate Limiter using Redis token-bucket and gRPC.\nSkills: Go, TypeScript, Python, Kafka, Redis, Docker, Kubernetes, SQL, System Design.",
+  Finance:
+    "Project: Comprehensive DCF and Three-Statement Financial Model for M&A Valuation.\nProject: Working Capital & Cash Conversion Cycle Optimization and Budget Variance Analysis.\nSkills: Financial Modeling, DCF Valuation, WACC, Three-Statement Modeling, Variance Analysis, Excel, Capital Budgeting, Financial Ratios.",
+  HR:
+    "Project: Comprehensive Workforce Retention & Attrition Diagnostic Initiative.\nProject: Structured Competency-Based Interviewing & Talent Acquisition Overhaul.\nSkills: Talent Acquisition, Employee Retention, Performance Management, HR Metrics, Compensation Bands, Onboarding, Workplace Culture.",
+  Marketing:
+    "Project: Multi-Touch Attribution & CAC Reduction Digital Marketing Campaign.\nProject: Conversion Rate Optimization (CRO) & Funnel Analysis across Paid Social and Search.\nSkills: Campaign Strategy, Customer Acquisition Cost (CAC), ROAS, Google Analytics, SEO/SEM, Funnel Optimization, Brand Positioning.",
+};
+
 const domainIcons: Record<InterviewDomain, typeof Users> = {
   "Role Specific": Users,
   DSA: Code2,
@@ -258,16 +270,27 @@ export default function InterviewSimulator() {
   const [selectedTurnId, setSelectedTurnId] = useState<number | null>(null);
   const selectedTurn = useMemo(() => history.find((t) => t.id === selectedTurnId) ?? null, [history, selectedTurnId]);
   const activeSkillGapReport = useMemo(() => {
-    return generateSkillGapReport(history, profile.targetRole);
-  }, [history, profile.targetRole]);
+    return generateSkillGapReport(history, profile.targetRole, profile.department);
+  }, [history, profile.targetRole, profile.department]);
   const activeRoadmap = useMemo(() => {
-    return generate7DayRoadmap(history, profile.targetRole);
-  }, [history, profile.targetRole]);
+    return generate7DayRoadmap(history, profile.targetRole, profile.department);
+  }, [history, profile.targetRole, profile.department]);
   const [sidebarTab, setSidebarTab] = useState<"scorecard" | "memory" | "skills" | "integrity">("scorecard");
+  const [isSignalTelemetryOpen, setIsSignalTelemetryOpen] = useState(false);
+  const [expandedSignals, setExpandedSignals] = useState<Record<string, boolean>>({});
+
+  function toggleSignalExpanded(label: string) {
+    setExpandedSignals((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  }
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const [showReplayModal, setShowReplayModal] = useState(false);
   const [showIntegrityModal, setShowIntegrityModal] = useState(false);
-  const [digitalProfile, setDigitalProfile] = useState<CandidateDigitalProfile>(loadStoredDigitalProfile);
+  const [digitalProfile, setDigitalProfile] = useState<CandidateDigitalProfile>(() =>
+    loadStoredDigitalProfile(initialProfile.name)
+  );
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [sessionSkillDeltas, setSessionSkillDeltas] = useState<{ skillName: string; oldScore: number; newScore: number; delta: number }[]>([]);
   const [activeBenchmark, setActiveBenchmark] = useState<SessionBenchmarkResult | null>(null);
@@ -398,7 +421,9 @@ export default function InterviewSimulator() {
   useEffect(() => {
     if (stage === "live" && profile.personaId === "stress_interviewer" && profile.stressConfig?.enableTimePressureClock) {
       const initialLimit = profile.stressConfig.timeLimitSec ?? 45;
-      setStressTimeRemaining(initialLimit);
+      const initTimer = setTimeout(() => {
+        setStressTimeRemaining(initialLimit);
+      }, 0);
 
       const timer = setInterval(() => {
         setStressTimeRemaining((prev) => {
@@ -407,7 +432,10 @@ export default function InterviewSimulator() {
         });
       }, 1000);
 
-      return () => clearInterval(timer);
+      return () => {
+        clearTimeout(initTimer);
+        clearInterval(timer);
+      };
     }
   }, [stage, questionIndex, profile.personaId, profile.stressConfig?.timeLimitSec, profile.stressConfig?.enableTimePressureClock]);
 
@@ -541,6 +569,31 @@ export default function InterviewSimulator() {
   }, [cameraEnabled]);
 
   function updateProfile<K extends keyof CandidateProfile>(key: K, value: CandidateProfile[K]) {
+    if (key === "name") {
+      const nameStr = typeof value === "string" ? value : String(value ?? "");
+      setDigitalProfile((current) => {
+        const next = { ...current, candidateName: nameStr };
+        saveDigitalProfile(next);
+        return next;
+      });
+    }
+    if (key === "targetRole" && value !== profile.targetRole) {
+      setQuestions([]);
+      setQuestionIndex(0);
+      setHistory([]);
+      setAnswer("");
+      setSessionMemory({
+        claims: [],
+        skills_demonstrated: [],
+        weak_topics: [],
+        strong_topics: [],
+        followups_pending: [],
+        conflicts: [],
+      });
+      if (stage === "live") {
+        setStage("setup");
+      }
+    }
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
@@ -552,12 +605,37 @@ export default function InterviewSimulator() {
     const isCodingAvailable = isInterviewTypeAvailableForDepartment(department, profile.interviewType);
     const nextInterviewType = isCodingAvailable ? profile.interviewType : "General";
 
+    // Invalidate stale questions and session state from the previous department
+    setQuestions([]);
+    setQuestionIndex(0);
+    setHistory([]);
+    setAnswer("");
+    setSessionMemory({
+      claims: [],
+      skills_demonstrated: [],
+      weak_topics: [],
+      strong_topics: [],
+      followups_pending: [],
+      conflicts: [],
+    });
+    if (stage === "live") {
+      setStage("setup");
+    }
+
+    const isDefaultSample =
+      !profile.resumeText ||
+      profile.resumeText.includes("Thyroid Disease Prediction") ||
+      Object.values(DEFAULT_SAMPLE_RESUMES).includes(profile.resumeText);
+
+    const nextResume = isDefaultSample ? DEFAULT_SAMPLE_RESUMES[department] : profile.resumeText;
+
     setProfile((current) => ({
       ...current,
       department,
       targetRole: getDefaultRoleForDepartment(department),
       domain: nextTrack,
       interviewType: nextInterviewType,
+      resumeText: nextResume,
     }));
   }
 
@@ -873,7 +951,9 @@ export default function InterviewSimulator() {
       sessionMemory,
       history.map((t, idx) => ({ answer: t.answer, turnId: idx + 1 })),
       history.length + 1,
-      turnBodyLanguageStats
+      turnBodyLanguageStats,
+      profile.department,
+      profile.targetRole
     );
 
     const technicalScore = evaluation.breakdown.technical_accuracy;
@@ -1318,7 +1398,7 @@ export default function InterviewSimulator() {
 
         {isWorkspaceOpen && (
           <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px] animate-in fade-in duration-300">
-          <aside className="flex flex-col gap-4 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5]">
+          <aside className="flex flex-col gap-4 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5] max-h-[calc(100vh-120px)] overflow-y-auto">
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Candidate</h2>
@@ -1338,6 +1418,7 @@ export default function InterviewSimulator() {
                   <input
                     value={profile.name}
                     onChange={(event) => updateProfile("name", event.target.value)}
+                    placeholder="Enter candidate name..."
                     className="h-9 rounded-xl border border-[#262626] bg-[#161616] px-3 text-xs text-[#F5F5F5] outline-none transition focus:border-[#FF4D3D]"
                   />
                 </label>
@@ -1519,276 +1600,10 @@ export default function InterviewSimulator() {
                 ))}
               </div>
             </section>
-
-            {/* Interview Input Mode (Text | Hybrid | Voice) */}
-            <section>
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Interview Mode</h2>
-                <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
-                  {profile.inputMode === "voice_only" ? "🎤 Voice First" : profile.inputMode === "text_only" ? "⌨️ Text Only" : "⚡ Hybrid"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "hybrid", label: "⚡ Hybrid", desc: "Type OR Voice" },
-                  { id: "voice_only", label: "🎤 Voice", desc: "Speech First" },
-                  { id: "text_only", label: "⌨️ Text", desc: "Keyboard Only" },
-                ].map((modeItem) => {
-                  const isCurrent = (profile.inputMode ?? "hybrid") === modeItem.id;
-                  return (
-                    <button
-                      key={modeItem.id}
-                      type="button"
-                      onClick={() => updateProfile("inputMode", modeItem.id as InterviewInputMode)}
-                      className={`flex flex-col items-center justify-center rounded-xl border p-2 text-center transition cursor-pointer ${
-                        isCurrent
-                          ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-xs ring-1 ring-[#FF4D3D]/40"
-                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
-                      }`}
-                    >
-                      <span className="text-xs font-bold leading-tight">{modeItem.label}</span>
-                      <span className={`text-[9.5px] font-mono mt-0.5 ${isCurrent ? "text-[#FF4D3D]" : "text-[#777777]"}`}>
-                        {modeItem.desc}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* AI Interviewer Persona Selector */}
-            <section>
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">AI Interviewer Persona</h2>
-                <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
-                  {activePersona.avatarEmoji} {activePersona.name}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {INTERVIEWER_PERSONA_LIST.map((persona) => {
-                  const isSelected = (profile.personaId ?? "technical") === persona.id;
-
-                  return (
-                    <button
-                      key={persona.id}
-                      type="button"
-                      onClick={() => updateProfile("personaId", persona.id)}
-                      className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
-                        isSelected
-                          ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-md ring-1 ring-[#FF4D3D]/40"
-                          : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
-                      }`}
-                    >
-                      {/* Avatar container */}
-                      <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
-                        isSelected
-                          ? "bg-[#FF4D3D]/20 border border-[#FF4D3D]/40"
-                          : "bg-[#0e0e0e] border border-[#222222]"
-                      }`}>
-                        {persona.avatarEmoji}
-                      </div>
-
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="font-bold text-xs leading-tight truncate text-[#F5F5F5]">
-                            {persona.name}
-                          </span>
-                          <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
-                            isSelected
-                              ? "bg-[#FF4D3D]/20 text-[#FF4D3D] border border-[#FF4D3D]/30"
-                              : "bg-[#222222] text-[#A0A0A0]"
-                          }`}>
-                            {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
-                          </span>
-                        </div>
-                        <p className={`mt-0.5 text-[11px] leading-snug truncate ${
-                          isSelected ? "text-[#FF4D3D]/80" : "text-[#777777]"
-                        }`}>
-                          {persona.tagline}
-                        </p>
-                      </div>
-
-                      {/* Selection indicator */}
-                      <div className="shrink-0">
-                        <div className={`size-4 rounded-full border flex items-center justify-center transition ${
-                          isSelected
-                            ? "border-[#FF4D3D] bg-[#FF4D3D] text-white"
-                            : "border-[#444444] bg-transparent group-hover:border-[#FF4D3D]"
-                        }`}>
-                          {isSelected && <div className="size-1.5 rounded-full bg-white" />}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Configurable Stress Mode Settings Panel */}
-              {profile.personaId === "stress_interviewer" && (
-                <div className="mt-3 rounded-xl border border-[#FF4D3D]/40 bg-[#1a0f0f] p-3.5 text-xs text-[#F5F5F5] space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between border-b border-[#FF4D3D]/20 pb-2">
-                    <div className="flex items-center gap-2 font-bold text-[#FF4D3D]">
-                      <span>😈 Stress Mode Configuration</span>
-                      <span className="rounded bg-[#FF4D3D]/20 px-2 py-0.5 text-[10px] font-mono font-bold text-[#FF4D3D]">
-                        Pressure HUD
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono text-[#A0A0A0]">
-                      Intensity: {profile.stressConfig?.intensity ?? "moderate"}
-                    </span>
-                  </div>
-
-                  {/* Intensity Selector */}
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-bold text-[#A0A0A0]">Time Pressure Intensity:</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "mild", label: "Mild (60s)", time: 60 },
-                        { id: "moderate", label: "Moderate (45s)", time: 45 },
-                        { id: "high", label: "High (30s)", time: 30 },
-                      ].map((lvl) => {
-                        const isCurrent = (profile.stressConfig?.intensity ?? "moderate") === lvl.id;
-                        return (
-                          <button
-                            key={lvl.id}
-                            type="button"
-                            onClick={() => {
-                              updateProfile("stressConfig", {
-                                ...profile.stressConfig,
-                                intensity: lvl.id as "mild" | "moderate" | "high",
-                                timeLimitSec: lvl.time,
-                                enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
-                                enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
-                              });
-                            }}
-                            className={`rounded-lg border p-2 text-center text-xs font-bold transition cursor-pointer ${
-                              isCurrent
-                                ? "border-[#FF4D3D] bg-[#FF4D3D] text-white shadow-xs"
-                                : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-white"
-                            }`}
-                          >
-                            {lvl.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Toggle Options */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={profile.stressConfig?.enableTimePressureClock ?? true}
-                        onChange={(e) => {
-                          updateProfile("stressConfig", {
-                            ...profile.stressConfig,
-                            intensity: profile.stressConfig?.intensity ?? "moderate",
-                            timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
-                            enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
-                            enableTimePressureClock: e.target.checked,
-                          });
-                        }}
-                        className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
-                      />
-                      <span className="font-semibold text-[#A0A0A0]">Live Countdown HUD Clock</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={profile.stressConfig?.enableInterruptions ?? true}
-                        onChange={(e) => {
-                          updateProfile("stressConfig", {
-                            ...profile.stressConfig,
-                            intensity: profile.stressConfig?.intensity ?? "moderate",
-                            timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
-                            enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
-                            enableInterruptions: e.target.checked,
-                          });
-                        }}
-                        className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
-                      />
-                      <span className="font-semibold text-[#A0A0A0]">Mid-Turn Rapid Probing</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Candidate Persistent Digital Profile Summary Card */}
-            <section className="rounded-xl border border-[#222222] bg-[#141414] p-3 text-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-[#222222] pb-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-[#F5F5F5]">
-                  <Fingerprint size={15} className="text-[#FF4D3D]" />
-                  <span>Persistent Digital Profile</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(true)}
-                  className="text-[10px] font-bold text-[#FF4D3D] hover:underline cursor-pointer"
-                >
-                  View Full Profile →
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
-                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Technical</div>
-                  <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.score}%</div>
-                </div>
-                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
-                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Communication</div>
-                  <div className="text-xs font-bold text-emerald-400">{digitalProfile.pillars.communication.score}%</div>
-                </div>
-                <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
-                  <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Behavioral</div>
-                  <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.behavioral.score}%</div>
-                </div>
-              </div>
-
-              {/* Sample Top Key Skills */}
-              <div className="space-y-1 text-[10.5px] font-mono text-[#A0A0A0]">
-                <div className="flex items-center justify-between text-[#666666] text-[10px]">
-                  <span>Tracked Skill Vector</span>
-                  <span>Proficiency</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Python</span>
-                  <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Machine Learning</span>
-                  <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>SQL Optimization</span>
-                  <span className="font-bold text-amber-400">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>RAG & LLM Architectures</span>
-                  <span className="font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
-                </div>
-              </div>
-
-              <div className="text-[10px] text-[#FF4D3D]/90 bg-[#FF4D3D]/10 rounded px-2 py-1 font-mono">
-                🧬 Future sessions start from this profile and probe priority growth areas.
-              </div>
-            </section>
-
-            <button
-              type="button"
-              onClick={startInterview}
-              className="mt-auto flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-4 text-sm font-bold text-white shadow-lg shadow-[#FF4D3D]/25 transition hover:brightness-110 active:scale-95 cursor-pointer"
-            >
-              <Play size={16} fill="currentColor" />
-              <span>{stage === "live" ? "Restart Interview" : "Start Interview"}</span>
-            </button>
           </aside>
 
           <section className="flex min-h-[720px] flex-col overflow-hidden rounded-2xl border border-[#222222] bg-[#111111] shadow-xl text-[#F5F5F5]">
-            <div className="grid flex-1 grid-rows-[minmax(240px,42vh)_1fr]">
+            <div className="grid flex-1 grid-rows-[minmax(240px,42vh)_auto_1fr]">
               <div className="relative bg-[#080808]">
                 <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted playsInline />
                 {!cameraEnabled ? (
@@ -1934,7 +1749,19 @@ export default function InterviewSimulator() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 p-4 lg:p-5 bg-[#0f0f0f]">
+              {/* Start Interview Action - Centered directly below video card */}
+              <div className="flex items-center justify-center border-y border-[#222222] bg-[#0c0c0c] py-3.5 px-4 shadow-inner">
+                <button
+                  type="button"
+                  onClick={startInterview}
+                  className="flex h-12 w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-6 text-sm font-bold text-white shadow-lg shadow-[#FF4D3D]/25 transition hover:brightness-110 active:scale-95 cursor-pointer"
+                >
+                  <Play size={16} fill="currentColor" />
+                  <span>{stage === "live" ? "Restart Interview" : "Start Interview"}</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4 p-4 lg:p-5 bg-[#0f0f0f] overflow-y-auto">
                 <div className="rounded-2xl border border-[#222222] bg-[#151515] p-5 shadow-sm">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[#F5F5F5]">
@@ -3000,7 +2827,7 @@ export default function InterviewSimulator() {
             </div>
           </section>
 
-          <aside className="flex flex-col gap-3 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5]">
+          <aside className="flex flex-col gap-3 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5] max-h-[calc(100vh-120px)] overflow-y-auto">
             {/* Tab Navigation for Sidebar - Spacious 2x2 Grid */}
             <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-[#222222] bg-[#0c0c0c] p-1 shadow-inner">
               {[
@@ -3074,200 +2901,579 @@ export default function InterviewSimulator() {
                   </div>
                 </section>
 
+                {/* Interview Input Mode (Text | Hybrid | Voice) */}
                 <section>
-                  <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-[#A0A0A0] flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-[#FF4D3D]"></span>
-                    Signal Telemetry
-                  </h2>
-                  <div className="grid gap-2">
-                    <SignalRow
-                      label="Technical accuracy"
-                      value={latestTurn?.breakdown?.technical_accuracy ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown.technical_accuracy}/100` : "--/100"}
-                      detail={latestTurn?.adaptiveStrategy ?? "Mechanism depth & concept coverage"}
-                    />
-                    <SignalRow
-                      label="Semantic relevance"
-                      value={latestTurn?.breakdown?.semantic_relevance ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown.semantic_relevance}/100` : "--/100"}
-                      detail="Question & keyword semantic alignment"
-                    />
-                    <SignalRow
-                      label="Answer structure"
-                      value={latestTurn?.breakdown?.answer_structure ?? 0}
-                      displayValue={
-                        latestTurn?.structureAnalysis
-                          ? `${latestTurn.structureAnalysis.framework === "STAR" ? "STAR" : "5-Point"}: ${latestTurn.breakdown.answer_structure}/100`
-                          : latestTurn
-                          ? `${latestTurn.breakdown.answer_structure}/100`
-                          : "--/100"
-                      }
-                      detail={
-                        latestTurn?.structureAnalysis?.coachingFeedback
-                          ? latestTurn.structureAnalysis.coachingFeedback
-                          : "Framework compliance & logical narrative flow"
-                      }
-                    />
-                    <SignalRow
-                      label="Speaking pace"
-                      value={
-                        speechState.wpm > 0
-                          ? Math.min(100, Math.round((speechState.wpm / 160) * 100))
-                          : latestTurn?.signals.paceStats
-                          ? Math.min(100, Math.round((latestTurn.signals.paceStats.wpm / 160) * 100))
-                          : latestTurn?.breakdown
-                          ? latestTurn.breakdown.speaking_pace
-                          : 0
-                      }
-                      displayValue={
-                        speechState.wpm > 0
-                          ? `${speechState.wpm} WPM`
-                          : latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.wpm} WPM`
-                          : micEnabled && isRecording
-                          ? "Listening..."
-                          : micEnabled
-                          ? "Ready"
-                          : "-- WPM"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.paceRating} · ${latestTurn.signals.paceStats.wordsSpoken} words in ${latestTurn.signals.paceStats.speechDurationSec}s`
-                          : speechState.wpm > 0
-                          ? `${speechState.paceRating} · ${speechState.wordsCount} words in ${speechState.speechDurationSec}s`
-                          : micEnabled
-                          ? "Speak into mic to measure pace"
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Pauses & hesitation"
-                      value={
-                        latestTurn?.signals.paceStats
-                          ? Math.max(0, 100 - (latestTurn.signals.paceStats.longPausesCount * 15 + Math.round(latestTurn.signals.paceStats.averagePauseSec * 10)))
-                          : speechState.longPausesCount > 0
-                          ? Math.max(0, 100 - speechState.longPausesCount * 15)
-                          : 88
-                      }
-                      displayValue={
-                        latestTurn?.signals.paceStats
-                          ? `Avg ${latestTurn.signals.paceStats.averagePauseSec}s · ${latestTurn.signals.paceStats.longPausesCount} long pauses`
-                          : speechState.pauseCount > 0
-                          ? `Avg ${speechState.averagePauseSec}s · ${speechState.longPausesCount} long`
-                          : "--"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats
-                          ? `${latestTurn.signals.paceStats.pauseCount} total pauses · longest: ${latestTurn.signals.paceStats.longestPauseSec}s`
-                          : micEnabled
-                          ? "Natural speech breath & pause tracking"
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Filler words"
-                      value={latestTurn?.breakdown?.filler_words ?? (latestTurn?.signals.paceStats ? Math.max(0, 100 - latestTurn.signals.paceStats.fillerWordsCount * 15) : 100)}
-                      displayValue={
-                        latestTurn?.signals.paceStats
-                          ? `Total: ${latestTurn.signals.paceStats.fillerWordsCount}`
-                          : speechState.totalFillers > 0
-                          ? `Total: ${speechState.totalFillers}`
-                          : "0 fillers"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats && latestTurn.signals.paceStats.fillerBreakdown?.length > 0
-                          ? latestTurn.signals.paceStats.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
-                          : speechState.fillerBreakdown?.length > 0
-                          ? speechState.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
-                          : "Clean speech delivery without filler bridging"
-                      }
-                    />
-                    <SignalRow
-                      label="Speech consistency"
-                      value={
-                        latestTurn?.signals.voiceStats?.consistencyScore ?? (micEnabled ? 88 : 0)
-                      }
-                      displayValue={
-                        latestTurn?.signals.voiceStats
-                          ? `Vol Var: ${latestTurn.signals.voiceStats.volumeVariabilityPercent}% · Pitch: ±${latestTurn.signals.voiceStats.pitchVariabilityHz}Hz`
-                          : micEnabled
-                          ? "Analyzing acoustic modulation..."
-                          : "--"
-                      }
-                      detail={
-                        latestTurn?.signals.paceStats?.paceTrend !== "steady"
-                          ? latestTurn?.signals.paceStats?.paceTrendDescription
-                          : latestTurn?.signals.voiceStats
-                          ? `Avg pitch ${latestTurn.signals.voiceStats.averagePitchHz}Hz · steady dynamic volume range`
-                          : "Acoustic volume & pitch dynamic tracking"
-                      }
-                    />
-                    <SignalRow
-                      label="Voice energy"
-                      value={micEnabled ? voiceSignal.energy : latestTurn?.breakdown?.voice_energy ?? latestTurn?.signals.voiceStats?.averageEnergy ?? latestTurn?.signals.voice ?? 0}
-                      detail={
-                        latestTurn?.signals.voiceStats
-                          ? `Avg ${latestTurn.signals.voiceStats.averageEnergy}% · Min ${latestTurn.signals.voiceStats.minEnergy}% · Max ${latestTurn.signals.voiceStats.maxEnergy}%`
-                          : micEnabled && typeof voiceSignal.db === "number"
-                          ? `${voiceSignal.db} dBFS · RMS ${voiceSignal.rms}`
-                          : undefined
-                      }
-                    />
-                    <SignalRow
-                      label="Eye contact"
-                      value={cameraEnabled ? eyeContact : latestTurn?.breakdown?.eye_contact ?? latestTurn?.signals.eyeContact ?? 0}
-                      displayValue={latestTurn ? `${latestTurn.breakdown?.eye_contact ?? latestTurn.signals.eyeContact}/100` : cameraEnabled ? `${eyeContact}/100` : "--/100"}
-                      detail={cameraEnabled && eyeContactResult ? `Status: ${eyeContactResult.status}` : "MediaPipe face mesh gaze"}
-                    />
-                    <SignalRow
-                      label="Head movement"
-                      value={cameraEnabled && eyeContactResult ? eyeContactResult.headMovementScore : latestTurn?.signals.bodyLanguageStats?.headMovementScore ?? (cameraEnabled ? 85 : 0)}
-                      displayValue={cameraEnabled && eyeContactResult ? `${eyeContactResult.headMovementScore}/100` : latestTurn?.signals.bodyLanguageStats ? `${latestTurn.signals.bodyLanguageStats.headMovementScore}/100` : "--/100"}
-                      detail="Head posture stability & composure"
-                    />
-                    <SignalRow
-                      label="Face orientation"
-                      value={cameraEnabled && eyeContactResult ? eyeContactResult.facingCameraPercent : latestTurn?.signals.bodyLanguageStats?.facingCameraPercent ?? (cameraEnabled ? 87 : 0)}
-                      displayValue={cameraEnabled && eyeContactResult ? `Facing camera: ${eyeContactResult.facingCameraPercent}%` : latestTurn?.signals.bodyLanguageStats ? `Facing camera: ${latestTurn.signals.bodyLanguageStats.facingCameraPercent}%` : "--%"}
-                      detail="Frontal camera alignment"
-                    />
-                    <SignalRow
-                      label="Looking away count"
-                      value={
-                        cameraEnabled && eyeContactResult
-                          ? Math.max(0, 100 - eyeContactResult.lookingAwayCount * 8)
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? Math.max(0, 100 - latestTurn.signals.bodyLanguageStats.lookingAwayCount * 8)
-                          : 90
-                      }
-                      displayValue={
-                        cameraEnabled && eyeContactResult
-                          ? `${eyeContactResult.lookingAwayCount} times`
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? `${latestTurn.signals.bodyLanguageStats.lookingAwayCount} times`
-                          : "0 times"
-                      }
-                      detail="Distinct glance shifts away from camera"
-                    />
-                    <SignalRow
-                      label="Facial expression"
-                      value={
-                        cameraEnabled && eyeContactResult
-                          ? eyeContactResult.expressionDistribution.neutralPercent + eyeContactResult.expressionDistribution.positivePercent
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent + latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent
-                          : 85
-                      }
-                      displayValue={
-                        cameraEnabled && eyeContactResult
-                          ? `Neutral ${eyeContactResult.expressionDistribution.neutralPercent}% · Pos ${eyeContactResult.expressionDistribution.positivePercent}% · Tense ${eyeContactResult.expressionDistribution.tensePercent}%`
-                          : latestTurn?.signals.bodyLanguageStats
-                          ? `Neutral ${latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent}% · Pos ${latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent}% · Tense ${latestTurn.signals.bodyLanguageStats.expressionDistribution.tensePercent}%`
-                          : "Neutral 62% · Pos 24% · Tense 14%"
-                      }
-                      detail="Broad communication presence (not emotion/lie detection)"
-                    />
-                    <SignalRow label="Question latency" value={Math.max(0, 100 - Math.round(backendLatency / 8))} />
+                  <div className="mb-2 flex items-center justify-between">
+                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">Interview Mode</h2>
+                    <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
+                      {profile.inputMode === "voice_only" ? "🎤 Voice First" : profile.inputMode === "text_only" ? "⌨️ Text Only" : "⚡ Hybrid"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "hybrid", label: "⚡ Hybrid", desc: "Type OR Voice" },
+                      { id: "voice_only", label: "🎤 Voice", desc: "Speech First" },
+                      { id: "text_only", label: "⌨️ Text", desc: "Keyboard Only" },
+                    ].map((modeItem) => {
+                      const isCurrent = (profile.inputMode ?? "hybrid") === modeItem.id;
+                      return (
+                        <button
+                          key={modeItem.id}
+                          type="button"
+                          onClick={() => updateProfile("inputMode", modeItem.id as InterviewInputMode)}
+                          className={`flex flex-col items-center justify-center rounded-xl border p-2 text-center transition cursor-pointer ${
+                            isCurrent
+                              ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-xs ring-1 ring-[#FF4D3D]/40"
+                              : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
+                          }`}
+                        >
+                          <span className="text-xs font-bold leading-tight">{modeItem.label}</span>
+                          <span className={`text-[9.5px] font-mono mt-0.5 ${isCurrent ? "text-[#FF4D3D]" : "text-[#777777]"}`}>
+                            {modeItem.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* AI Interviewer Persona Selector */}
+                <section>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#A0A0A0]">AI Interviewer Persona</h2>
+                    <span className="rounded bg-[#FF4D3D]/10 text-[#FF4D3D] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#FF4D3D]/20">
+                      {activePersona.avatarEmoji} {activePersona.name}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {INTERVIEWER_PERSONA_LIST.map((persona) => {
+                      const isSelected = (profile.personaId ?? "technical") === persona.id;
+
+                      return (
+                        <button
+                          key={persona.id}
+                          type="button"
+                          onClick={() => updateProfile("personaId", persona.id)}
+                          className={`group relative flex items-center gap-3 rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                            isSelected
+                              ? "border-[#FF4D3D] bg-[#1f1212] text-white shadow-md ring-1 ring-[#FF4D3D]/40"
+                              : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:border-[#FF4D3D]/40 hover:text-white"
+                          }`}
+                        >
+                          {/* Avatar container */}
+                          <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-xl transition ${
+                            isSelected
+                              ? "bg-[#FF4D3D]/20 border border-[#FF4D3D]/40"
+                              : "bg-[#0e0e0e] border border-[#222222]"
+                          }`}>
+                            {persona.avatarEmoji}
+                          </div>
+
+                          {/* Info */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-bold text-xs leading-tight truncate text-[#F5F5F5]">
+                                {persona.name}
+                              </span>
+                              <span className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
+                                isSelected
+                                  ? "bg-[#FF4D3D]/20 text-[#FF4D3D] border border-[#FF4D3D]/30"
+                                  : "bg-[#222222] text-[#A0A0A0]"
+                              }`}>
+                                {persona.id === "stress_interviewer" ? "Stress Mode" : persona.role.split("&")[0].trim()}
+                              </span>
+                            </div>
+                            <p className={`mt-0.5 text-[11px] leading-snug truncate ${
+                              isSelected ? "text-[#FF4D3D]/80" : "text-[#777777]"
+                            }`}>
+                              {persona.tagline}
+                            </p>
+                          </div>
+
+                          {/* Selection indicator */}
+                          <div className="shrink-0">
+                            <div className={`size-4 rounded-full border flex items-center justify-center transition ${
+                              isSelected
+                                ? "border-[#FF4D3D] bg-[#FF4D3D] text-white"
+                                : "border-[#444444] bg-transparent group-hover:border-[#FF4D3D]"
+                            }`}>
+                              {isSelected && <div className="size-1.5 rounded-full bg-white" />}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Configurable Stress Mode Settings Panel */}
+                  {profile.personaId === "stress_interviewer" && (
+                    <div className="mt-3 rounded-xl border border-[#FF4D3D]/40 bg-[#1a0f0f] p-3.5 text-xs text-[#F5F5F5] space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between border-b border-[#FF4D3D]/20 pb-2">
+                        <div className="flex items-center gap-2 font-bold text-[#FF4D3D]">
+                          <span>😈 Stress Mode Configuration</span>
+                          <span className="rounded bg-[#FF4D3D]/20 px-2 py-0.5 text-[10px] font-mono font-bold text-[#FF4D3D]">
+                            Pressure HUD
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[#A0A0A0]">
+                          Intensity: {profile.stressConfig?.intensity ?? "moderate"}
+                        </span>
+                      </div>
+
+                      {/* Intensity Selector */}
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-[#A0A0A0]">Time Pressure Intensity:</span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "mild", label: "Mild (60s)", time: 60 },
+                            { id: "moderate", label: "Moderate (45s)", time: 45 },
+                            { id: "high", label: "High (30s)", time: 30 },
+                          ].map((lvl) => {
+                            const isCurrent = (profile.stressConfig?.intensity ?? "moderate") === lvl.id;
+                            return (
+                              <button
+                                key={lvl.id}
+                                type="button"
+                                onClick={() => {
+                                  updateProfile("stressConfig", {
+                                    ...profile.stressConfig,
+                                    intensity: lvl.id as "mild" | "moderate" | "high",
+                                    timeLimitSec: lvl.time,
+                                    enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
+                                    enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
+                                  });
+                                }}
+                                className={`rounded-lg border p-2 text-center text-xs font-bold transition cursor-pointer ${
+                                  isCurrent
+                                    ? "border-[#FF4D3D] bg-[#FF4D3D] text-white shadow-xs"
+                                    : "border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-white"
+                                }`}
+                              >
+                                {lvl.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Toggle Options */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profile.stressConfig?.enableTimePressureClock ?? true}
+                            onChange={(e) => {
+                              updateProfile("stressConfig", {
+                                ...profile.stressConfig,
+                                intensity: profile.stressConfig?.intensity ?? "moderate",
+                                timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
+                                enableInterruptions: profile.stressConfig?.enableInterruptions ?? true,
+                                enableTimePressureClock: e.target.checked,
+                              });
+                            }}
+                            className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
+                          />
+                          <span className="font-semibold text-[#A0A0A0]">Live Countdown HUD Clock</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profile.stressConfig?.enableInterruptions ?? true}
+                            onChange={(e) => {
+                              updateProfile("stressConfig", {
+                                ...profile.stressConfig,
+                                intensity: profile.stressConfig?.intensity ?? "moderate",
+                                timeLimitSec: profile.stressConfig?.timeLimitSec ?? 45,
+                                enableTimePressureClock: profile.stressConfig?.enableTimePressureClock ?? true,
+                                enableInterruptions: e.target.checked,
+                              });
+                            }}
+                            className="rounded border-[#FF4D3D]/50 text-[#FF4D3D] focus:ring-[#FF4D3D]"
+                          />
+                          <span className="font-semibold text-[#A0A0A0]">Mid-Turn Rapid Probing</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Candidate Persistent Digital Profile Summary Card */}
+                <section className="rounded-xl border border-[#222222] bg-[#141414] p-3 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-[#222222] pb-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-[#F5F5F5]">
+                      <Fingerprint size={15} className="text-[#FF4D3D]" />
+                      <span>Persistent Digital Profile</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileModal(true)}
+                      className="text-[10px] font-bold text-[#FF4D3D] hover:underline cursor-pointer"
+                    >
+                      View Full Profile →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
+                    <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                      <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Technical</div>
+                      <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.score}%</div>
+                    </div>
+                    <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                      <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Communication</div>
+                      <div className="text-xs font-bold text-emerald-400">{digitalProfile.pillars.communication.score}%</div>
+                    </div>
+                    <div className="rounded bg-[#0e0e0e] p-1.5 border border-[#222222]">
+                      <div className="text-[9px] text-[#A0A0A0] font-semibold uppercase">Behavioral</div>
+                      <div className="text-xs font-bold text-[#FF4D3D]">{digitalProfile.pillars.behavioral.score}%</div>
+                    </div>
+                  </div>
+
+                  {/* Sample Top Key Skills */}
+                  <div className="space-y-1 text-[10.5px] font-mono text-[#A0A0A0]">
+                    <div className="flex items-center justify-between text-[#666666] text-[10px]">
+                      <span>Tracked Skill Vector</span>
+                      <span>Proficiency</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Python</span>
+                      <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.python?.score ?? 91}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Machine Learning</span>
+                      <span className="font-bold text-emerald-400">{digitalProfile.pillars.technical.skills.ml?.score ?? 84}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>SQL Optimization</span>
+                      <span className="font-bold text-amber-400">{digitalProfile.pillars.technical.skills.sql?.score ?? 72}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>RAG & LLM Architectures</span>
+                      <span className="font-bold text-[#FF4D3D]">{digitalProfile.pillars.technical.skills.rag?.score ?? 67}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-[#FF4D3D]/90 bg-[#FF4D3D]/10 rounded px-2 py-1 font-mono">
+                    🧬 Future sessions start from this profile and probe priority growth areas.
+                  </div>
+                </section>
+
+                <section>
+                  <div className="rounded-xl border border-[#262626] bg-[#141414] overflow-hidden transition-all duration-200">
+                    <button
+                      type="button"
+                      onClick={() => setIsSignalTelemetryOpen((prev) => !prev)}
+                      className="w-full flex items-center justify-between px-3.5 py-3 text-left transition hover:bg-[#1a1a1a] cursor-pointer group"
+                      aria-expanded={isSignalTelemetryOpen}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4D3D] opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4D3D]"></span>
+                        </span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5] group-hover:text-white transition">
+                          Signal Telemetry
+                        </span>
+                        <span className="rounded-md bg-[#222222] border border-[#333333] px-2 py-0.5 text-[10px] font-mono text-[#A0A0A0]">
+                          14 metrics
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-[#A0A0A0] group-hover:text-[#F5F5F5]">
+                        <span className="text-[11px] font-medium hidden sm:inline">
+                          {isSignalTelemetryOpen ? "Close menu" : "Open menu"}
+                        </span>
+                        <ChevronDown
+                          size={15}
+                          className={`transition-transform duration-200 text-[#FF4D3D] ${
+                            isSignalTelemetryOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </div>
+                    </button>
+
+                    {isSignalTelemetryOpen && (
+                      <div className="p-3 border-t border-[#222222] bg-[#0d0d0d]/90 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex items-center justify-between text-[11px] text-[#777777] px-1 pb-1">
+                          <span>Click any metric to view contents</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allSignalNames = [
+                                "Technical accuracy",
+                                "Semantic relevance",
+                                "Answer structure",
+                                "Speaking pace",
+                                "Pauses & hesitation",
+                                "Filler words",
+                                "Speech consistency",
+                                "Voice energy",
+                                "Eye contact",
+                                "Head movement",
+                                "Face orientation",
+                                "Looking away count",
+                                "Facial expression",
+                                "Question latency",
+                              ];
+                              const allAreOpen = allSignalNames.every((name) => expandedSignals[name]);
+                              if (allAreOpen) {
+                                setExpandedSignals({});
+                              } else {
+                                const next: Record<string, boolean> = {};
+                                allSignalNames.forEach((n) => {
+                                  next[n] = true;
+                                });
+                                setExpandedSignals(next);
+                              }
+                            }}
+                            className="text-[#FF4D3D] hover:underline cursor-pointer font-medium"
+                          >
+                            {[
+                              "Technical accuracy",
+                              "Semantic relevance",
+                              "Answer structure",
+                              "Speaking pace",
+                              "Pauses & hesitation",
+                              "Filler words",
+                              "Speech consistency",
+                              "Voice energy",
+                              "Eye contact",
+                              "Head movement",
+                              "Face orientation",
+                              "Looking away count",
+                              "Facial expression",
+                              "Question latency",
+                            ].every((n) => expandedSignals[n])
+                              ? "Collapse All"
+                              : "Expand All"}
+                          </button>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <SignalRow
+                            label="Technical accuracy"
+                            value={latestTurn?.breakdown?.technical_accuracy ?? 0}
+                            displayValue={latestTurn ? `${latestTurn.breakdown.technical_accuracy}/100` : "--/100"}
+                            detail={latestTurn?.adaptiveStrategy ?? "Mechanism depth & concept coverage"}
+                            isExpanded={Boolean(expandedSignals["Technical accuracy"])}
+                            onToggle={() => toggleSignalExpanded("Technical accuracy")}
+                          />
+                          <SignalRow
+                            label="Semantic relevance"
+                            value={latestTurn?.breakdown?.semantic_relevance ?? 0}
+                            displayValue={latestTurn ? `${latestTurn.breakdown.semantic_relevance}/100` : "--/100"}
+                            detail="Question & keyword semantic alignment"
+                            isExpanded={Boolean(expandedSignals["Semantic relevance"])}
+                            onToggle={() => toggleSignalExpanded("Semantic relevance")}
+                          />
+                          <SignalRow
+                            label="Answer structure"
+                            value={latestTurn?.breakdown?.answer_structure ?? 0}
+                            displayValue={
+                              latestTurn?.structureAnalysis
+                                ? `${latestTurn.structureAnalysis.framework === "STAR" ? "STAR" : "5-Point"}: ${latestTurn.breakdown.answer_structure}/100`
+                                : latestTurn
+                                ? `${latestTurn.breakdown.answer_structure}/100`
+                                : "--/100"
+                            }
+                            detail={
+                              latestTurn?.structureAnalysis?.coachingFeedback
+                                ? latestTurn.structureAnalysis.coachingFeedback
+                                : "Framework compliance & logical narrative flow"
+                            }
+                            isExpanded={Boolean(expandedSignals["Answer structure"])}
+                            onToggle={() => toggleSignalExpanded("Answer structure")}
+                          />
+                          <SignalRow
+                            label="Speaking pace"
+                            value={
+                              speechState.wpm > 0
+                                ? Math.min(100, Math.round((speechState.wpm / 160) * 100))
+                                : latestTurn?.signals.paceStats
+                                ? Math.min(100, Math.round((latestTurn.signals.paceStats.wpm / 160) * 100))
+                                : latestTurn?.breakdown
+                                ? latestTurn.breakdown.speaking_pace
+                                : 0
+                            }
+                            displayValue={
+                              speechState.wpm > 0
+                                ? `${speechState.wpm} WPM`
+                                : latestTurn?.signals.paceStats
+                                ? `${latestTurn.signals.paceStats.wpm} WPM`
+                                : micEnabled && isRecording
+                                ? "Listening..."
+                                : micEnabled
+                                ? "Ready"
+                                : "-- WPM"
+                            }
+                            detail={
+                              latestTurn?.signals.paceStats
+                                ? `${latestTurn.signals.paceStats.paceRating} · ${latestTurn.signals.paceStats.wordsSpoken} words in ${latestTurn.signals.paceStats.speechDurationSec}s`
+                                : speechState.wpm > 0
+                                ? `${speechState.paceRating} · ${speechState.wordsCount} words in ${speechState.speechDurationSec}s`
+                                : micEnabled
+                                ? "Speak into mic to measure pace"
+                                : undefined
+                            }
+                            isExpanded={Boolean(expandedSignals["Speaking pace"])}
+                            onToggle={() => toggleSignalExpanded("Speaking pace")}
+                          />
+                          <SignalRow
+                            label="Pauses & hesitation"
+                            value={
+                              latestTurn?.signals.paceStats
+                                ? Math.max(0, 100 - (latestTurn.signals.paceStats.longPausesCount * 15 + Math.round(latestTurn.signals.paceStats.averagePauseSec * 10)))
+                                : speechState.longPausesCount > 0
+                                ? Math.max(0, 100 - speechState.longPausesCount * 15)
+                                : 88
+                            }
+                            displayValue={
+                              latestTurn?.signals.paceStats
+                                ? `Avg ${latestTurn.signals.paceStats.averagePauseSec}s · ${latestTurn.signals.paceStats.longPausesCount} long pauses`
+                                : speechState.pauseCount > 0
+                                ? `Avg ${speechState.averagePauseSec}s · ${speechState.longPausesCount} long`
+                                : "--"
+                            }
+                            detail={
+                              latestTurn?.signals.paceStats
+                                ? `${latestTurn.signals.paceStats.pauseCount} total pauses · longest: ${latestTurn.signals.paceStats.longestPauseSec}s`
+                                : micEnabled
+                                ? "Natural speech breath & pause tracking"
+                                : undefined
+                            }
+                            isExpanded={Boolean(expandedSignals["Pauses & hesitation"])}
+                            onToggle={() => toggleSignalExpanded("Pauses & hesitation")}
+                          />
+                          <SignalRow
+                            label="Filler words"
+                            value={latestTurn?.breakdown?.filler_words ?? (latestTurn?.signals.paceStats ? Math.max(0, 100 - latestTurn.signals.paceStats.fillerWordsCount * 15) : 100)}
+                            displayValue={
+                              latestTurn?.signals.paceStats
+                                ? `Total: ${latestTurn.signals.paceStats.fillerWordsCount}`
+                                : speechState.totalFillers > 0
+                                ? `Total: ${speechState.totalFillers}`
+                                : "0 fillers"
+                            }
+                            detail={
+                              latestTurn?.signals.paceStats && latestTurn.signals.paceStats.fillerBreakdown?.length > 0
+                                ? latestTurn.signals.paceStats.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
+                                : speechState.fillerBreakdown?.length > 0
+                                ? speechState.fillerBreakdown.slice(0, 4).map((f) => `"${f.word}" ${f.count}`).join(" · ")
+                                : "Clean speech delivery without filler bridging"
+                            }
+                            isExpanded={Boolean(expandedSignals["Filler words"])}
+                            onToggle={() => toggleSignalExpanded("Filler words")}
+                          />
+                          <SignalRow
+                            label="Speech consistency"
+                            value={
+                              latestTurn?.signals.voiceStats?.consistencyScore ?? (micEnabled ? 88 : 0)
+                            }
+                            displayValue={
+                              latestTurn?.signals.voiceStats
+                                ? `Vol Var: ${latestTurn.signals.voiceStats.volumeVariabilityPercent}% · Pitch: ±${latestTurn.signals.voiceStats.pitchVariabilityHz}Hz`
+                                : micEnabled
+                                ? "Analyzing acoustic modulation..."
+                                : "--"
+                            }
+                            detail={
+                              latestTurn?.signals.paceStats?.paceTrend !== "steady"
+                                ? latestTurn?.signals.paceStats?.paceTrendDescription
+                                : latestTurn?.signals.voiceStats
+                              ? `Avg pitch ${latestTurn.signals.voiceStats.averagePitchHz}Hz · steady dynamic volume range`
+                              : "Acoustic volume & pitch dynamic tracking"
+                            }
+                            isExpanded={Boolean(expandedSignals["Speech consistency"])}
+                            onToggle={() => toggleSignalExpanded("Speech consistency")}
+                          />
+                          <SignalRow
+                            label="Voice energy"
+                            value={micEnabled ? voiceSignal.energy : latestTurn?.breakdown?.voice_energy ?? latestTurn?.signals.voiceStats?.averageEnergy ?? latestTurn?.signals.voice ?? 0}
+                            displayValue={micEnabled ? `${voiceSignal.energy}%` : latestTurn?.breakdown?.voice_energy ? `${latestTurn.breakdown.voice_energy}%` : "--%"}
+                            detail={
+                              latestTurn?.signals.voiceStats
+                                ? `Avg ${latestTurn.signals.voiceStats.averageEnergy}% · Min ${latestTurn.signals.voiceStats.minEnergy}% · Max ${latestTurn.signals.voiceStats.maxEnergy}%`
+                                : micEnabled && typeof voiceSignal.db === "number"
+                                ? `${voiceSignal.db} dBFS · RMS ${voiceSignal.rms}`
+                                : undefined
+                            }
+                            isExpanded={Boolean(expandedSignals["Voice energy"])}
+                            onToggle={() => toggleSignalExpanded("Voice energy")}
+                          />
+                          <SignalRow
+                            label="Eye contact"
+                            value={cameraEnabled ? eyeContact : latestTurn?.breakdown?.eye_contact ?? latestTurn?.signals.eyeContact ?? 0}
+                            displayValue={latestTurn ? `${latestTurn.breakdown?.eye_contact ?? latestTurn.signals.eyeContact}/100` : cameraEnabled ? `${eyeContact}/100` : "--/100"}
+                            detail={cameraEnabled && eyeContactResult ? `Status: ${eyeContactResult.status}` : "MediaPipe face mesh gaze"}
+                            isExpanded={Boolean(expandedSignals["Eye contact"])}
+                            onToggle={() => toggleSignalExpanded("Eye contact")}
+                          />
+                          <SignalRow
+                            label="Head movement"
+                            value={cameraEnabled && eyeContactResult ? eyeContactResult.headMovementScore : latestTurn?.signals.bodyLanguageStats?.headMovementScore ?? (cameraEnabled ? 85 : 0)}
+                            displayValue={cameraEnabled && eyeContactResult ? `${eyeContactResult.headMovementScore}/100` : latestTurn?.signals.bodyLanguageStats ? `${latestTurn.signals.bodyLanguageStats.headMovementScore}/100` : "--/100"}
+                            detail="Head posture stability & composure"
+                            isExpanded={Boolean(expandedSignals["Head movement"])}
+                            onToggle={() => toggleSignalExpanded("Head movement")}
+                          />
+                          <SignalRow
+                            label="Face orientation"
+                            value={cameraEnabled && eyeContactResult ? eyeContactResult.facingCameraPercent : latestTurn?.signals.bodyLanguageStats?.facingCameraPercent ?? (cameraEnabled ? 87 : 0)}
+                            displayValue={cameraEnabled && eyeContactResult ? `Facing camera: ${eyeContactResult.facingCameraPercent}%` : latestTurn?.signals.bodyLanguageStats ? `Facing camera: ${latestTurn.signals.bodyLanguageStats.facingCameraPercent}%` : "--%"}
+                            detail="Frontal camera alignment"
+                            isExpanded={Boolean(expandedSignals["Face orientation"])}
+                            onToggle={() => toggleSignalExpanded("Face orientation")}
+                          />
+                          <SignalRow
+                            label="Looking away count"
+                            value={
+                              cameraEnabled && eyeContactResult
+                                ? Math.max(0, 100 - eyeContactResult.lookingAwayCount * 8)
+                                : latestTurn?.signals.bodyLanguageStats
+                                ? Math.max(0, 100 - latestTurn.signals.bodyLanguageStats.lookingAwayCount * 8)
+                                : 90
+                            }
+                            displayValue={
+                              cameraEnabled && eyeContactResult
+                                ? `${eyeContactResult.lookingAwayCount} times`
+                                : latestTurn?.signals.bodyLanguageStats
+                                ? `${latestTurn.signals.bodyLanguageStats.lookingAwayCount} times`
+                                : "0 times"
+                            }
+                            detail="Distinct glance shifts away from camera"
+                            isExpanded={Boolean(expandedSignals["Looking away count"])}
+                            onToggle={() => toggleSignalExpanded("Looking away count")}
+                          />
+                          <SignalRow
+                            label="Facial expression"
+                            value={
+                              cameraEnabled && eyeContactResult
+                                ? eyeContactResult.expressionDistribution.neutralPercent + eyeContactResult.expressionDistribution.positivePercent
+                                : latestTurn?.signals.bodyLanguageStats
+                                ? latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent + latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent
+                                : 85
+                            }
+                            displayValue={
+                              cameraEnabled && eyeContactResult
+                                ? `Neutral ${eyeContactResult.expressionDistribution.neutralPercent}% · Pos ${eyeContactResult.expressionDistribution.positivePercent}% · Tense ${eyeContactResult.expressionDistribution.tensePercent}%`
+                                : latestTurn?.signals.bodyLanguageStats
+                                ? `Neutral ${latestTurn.signals.bodyLanguageStats.expressionDistribution.neutralPercent}% · Pos ${latestTurn.signals.bodyLanguageStats.expressionDistribution.positivePercent}% · Tense ${latestTurn.signals.bodyLanguageStats.expressionDistribution.tensePercent}%`
+                                : "Neutral 62% · Pos 24% · Tense 14%"
+                            }
+                            detail="Broad communication presence (not emotion/lie detection)"
+                            isExpanded={Boolean(expandedSignals["Facial expression"])}
+                            onToggle={() => toggleSignalExpanded("Facial expression")}
+                          />
+                          <SignalRow
+                            label="Question latency"
+                            value={Math.max(0, 100 - Math.round(backendLatency / 8))}
+                            displayValue={backendLatency > 0 ? `${backendLatency}ms` : "--"}
+                            detail={backendLatency > 0 ? `API turnaround roundtrip: ${backendLatency}ms` : "Edge/cloud API turnaround latency"}
+                            isExpanded={Boolean(expandedSignals["Question latency"])}
+                            onToggle={() => toggleSignalExpanded("Question latency")}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -3632,7 +3838,7 @@ export default function InterviewSimulator() {
           profile={digitalProfile}
           onClose={() => setShowProfileModal(false)}
           onResetProfile={() => {
-            const fresh = resetDigitalProfile();
+            const fresh = resetDigitalProfile(profile.name);
             setDigitalProfile(fresh);
           }}
         />
@@ -3953,21 +4159,85 @@ function SignalRow({
   value,
   displayValue,
   detail,
+  isExpanded,
+  onToggle,
 }: {
   label: string;
   value: number;
   displayValue?: string;
   detail?: string;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }) {
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const expanded = isExpanded !== undefined ? isExpanded : internalExpanded;
+  const toggle = onToggle ?? (() => setInternalExpanded((prev) => !prev));
+
+  const formattedValue = displayValue !== undefined ? displayValue : value ? `${Math.round(value)}%` : "--";
+  const numValue = Math.min(100, Math.max(0, Math.round(value)));
+
+  const toneColor =
+    numValue >= 80 ? "bg-emerald-500" : numValue >= 60 ? "bg-amber-500" : numValue > 0 ? "bg-[#FF4D3D]" : "bg-zinc-600";
+  const textColor =
+    numValue >= 80 ? "text-emerald-400" : numValue >= 60 ? "text-amber-400" : numValue > 0 ? "text-[#FF4D3D]" : "text-[#A0A0A0]";
+
   return (
-    <div className="flex flex-col gap-0.5 rounded-xl border border-[#222222] bg-[#141414] px-3 py-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-[#A0A0A0]">{label}</span>
-        <span className="text-xs font-bold text-[#F5F5F5] font-mono">
-          {displayValue !== undefined ? displayValue : value ? `${Math.round(value)}%` : "--"}
-        </span>
-      </div>
-      {detail ? <span className="text-[10px] text-[#777777] font-mono">{detail}</span> : null}
+    <div
+      className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+        expanded
+          ? "border-[#FF4D3D]/40 bg-[#161616] shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+          : "border-[#222222] bg-[#141414] hover:border-[#333333] hover:bg-[#181818]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-3 py-2 text-left cursor-pointer group select-none"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`size-1.5 rounded-full shrink-0 transition-colors ${expanded ? toneColor : "bg-[#555555] group-hover:bg-[#FF4D3D]"}`} />
+          <span className="text-xs font-medium text-[#D0D0D0] group-hover:text-[#FFFFFF] truncate transition">
+            {label}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[11px] font-mono font-semibold transition ${expanded ? textColor : "text-[#888888] group-hover:text-[#C0C0C0]"}`}>
+            {expanded ? formattedValue : "Inspect"}
+          </span>
+          <ChevronDown
+            size={13}
+            className={`text-[#777777] group-hover:text-[#F5F5F5] transition-transform duration-200 ${
+              expanded ? "rotate-180 text-[#FF4D3D]" : ""
+            }`}
+          />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-2.5 pt-1 border-t border-[#222222]/60 flex flex-col gap-2 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-[#777777]">Telemetry Reading</span>
+            <span className={`text-xs font-bold font-mono ${textColor}`}>
+              {formattedValue}
+            </span>
+          </div>
+
+          <div className="w-full h-1.5 bg-[#222222] rounded-full overflow-hidden">
+            <div
+              className={`h-full ${toneColor} transition-all duration-300 rounded-full`}
+              style={{ width: `${numValue}%` }}
+            />
+          </div>
+
+          {detail && (
+            <div className="rounded-lg bg-[#0e0e0e] border border-[#222222] px-2.5 py-1.5 text-[11px] font-mono text-[#999999] leading-snug">
+              {detail}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -4408,6 +4678,7 @@ function TurnInspectorModal({
   const weakness = synthesizeTurnWeakness(turn);
   const prevTurn = allTurns.find((t) => t.id === turn.id - 1);
   const nextTurn = allTurns.find((t) => t.id === turn.id + 1);
+  const [isTurnTelemetryOpen, setIsTurnTelemetryOpen] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/75 p-4 backdrop-blur-xs animate-in fade-in duration-200">
@@ -4567,54 +4838,77 @@ function TurnInspectorModal({
         )}
 
         {/* Multimodal Scorecard Grid */}
-        <div className="mb-4">
-          <div className="text-xs font-bold text-zinc-900 mb-2 uppercase tracking-wide">
-            Multimodal Signal Telemetry
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Technical Accuracy</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-emerald-700">
-                {turn.breakdown?.technical_accuracy ?? turn.score}/100
-              </div>
-              <div className="text-[10px] text-zinc-400">Algorithmic accuracy</div>
+        <div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50/70 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsTurnTelemetryOpen(!isTurnTelemetryOpen)}
+            className="w-full flex items-center justify-between p-3 text-left transition hover:bg-zinc-100/80 cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-[#FF4D3D]" />
+              <span className="text-xs font-bold text-zinc-900 uppercase tracking-wide">
+                Multimodal Signal Telemetry
+              </span>
+              <span className="rounded bg-zinc-200/80 px-2 py-0.5 text-[10px] font-mono text-zinc-600 font-semibold">
+                6 metrics
+              </span>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Semantic Relevance</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-blue-700">
-                {turn.breakdown?.semantic_relevance ?? 85}/100
-              </div>
-              <div className="text-[10px] text-zinc-400">Contextual alignment</div>
+            <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
+              <span>{isTurnTelemetryOpen ? "Hide" : "View"}</span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-200 ${
+                  isTurnTelemetryOpen ? "rotate-180 text-[#FF4D3D]" : ""
+                }`}
+              />
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Eye Contact</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-amber-700">
-                {turn.breakdown?.eye_contact ?? turn.signals.eyeContact}/100
+          </button>
+          {isTurnTelemetryOpen && (
+            <div className="p-3 border-t border-zinc-200 grid grid-cols-2 gap-2 sm:grid-cols-3 animate-in fade-in duration-150">
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Technical Accuracy</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-emerald-700">
+                  {turn.breakdown?.technical_accuracy ?? turn.score}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">Algorithmic accuracy</div>
               </div>
-              <div className="text-[10px] text-zinc-400">Gaze focus stability</div>
-            </div>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Speaking Pace</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-zinc-800">
-                {turn.breakdown?.speaking_pace ?? 80}/100
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Semantic Relevance</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-blue-700">
+                  {turn.breakdown?.semantic_relevance ?? 85}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">Contextual alignment</div>
               </div>
-              <div className="text-[10px] text-zinc-400">{turn.signals.paceStats?.wpm ?? 120} WPM cadence</div>
-            </div>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Voice Energy</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-zinc-800">
-                {turn.breakdown?.voice_energy ?? turn.signals.voice}/100
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Eye Contact</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-amber-700">
+                  {turn.breakdown?.eye_contact ?? turn.signals.eyeContact}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">Gaze focus stability</div>
               </div>
-              <div className="text-[10px] text-zinc-400">Acoustic resonance</div>
-            </div>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50/70 p-2.5">
-              <div className="text-[11px] font-semibold text-zinc-500">Filler Words</div>
-              <div className="mt-0.5 font-mono text-base font-bold text-emerald-700">
-                {turn.breakdown?.filler_words ?? 90}/100
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Speaking Pace</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-zinc-800">
+                  {turn.breakdown?.speaking_pace ?? 80}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">{turn.signals.paceStats?.wpm ?? 120} WPM cadence</div>
               </div>
-              <div className="text-[10px] text-zinc-400">{turn.signals.paceStats?.fillerWordsCount ?? 0} fillers detected</div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Voice Energy</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-zinc-800">
+                  {turn.breakdown?.voice_energy ?? turn.signals.voice}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">Acoustic resonance</div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-2.5">
+                <div className="text-[11px] font-semibold text-zinc-500">Filler Words</div>
+                <div className="mt-0.5 font-mono text-base font-bold text-emerald-700">
+                  {turn.breakdown?.filler_words ?? 90}/100
+                </div>
+                <div className="text-[10px] text-zinc-400">{turn.signals.paceStats?.fillerWordsCount ?? 0} fillers detected</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Synthesized Weakness / Strength Finding */}
@@ -6634,7 +6928,7 @@ function CandidateDigitalProfileModal({
                 </span>
               </div>
               <p className="text-xs text-zinc-400 font-mono">
-                Candidate: {profile.candidateName} · {profile.sessionsCompleted} Historical Sessions Tracked · Last active: {profile.lastInterviewDate}
+                Candidate: {profile.candidateName || "Candidate"} · {profile.sessionsCompleted} Historical Sessions Tracked · Last active: {profile.lastInterviewDate}
               </p>
             </div>
           </div>
@@ -6828,27 +7122,33 @@ function CandidateDigitalProfileModal({
               Recent Interview Ledger ({profile.sessionHistory.length} Recorded)
             </span>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {profile.sessionHistory.map((sess) => (
-                <div key={sess.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-xs">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">{sess.targetRole}</span>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
-                        {sess.department}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 truncate max-w-md">
-                      Strength: {sess.topStrength}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono shrink-0">
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-purple-400">{sess.overallScore}/100</div>
-                      <div className="text-[10px] text-zinc-500">{sess.timestamp.split("T")[0]}</div>
-                    </div>
-                  </div>
+              {profile.sessionHistory.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 p-6 text-center text-xs text-zinc-500">
+                  No completed interview sessions in this browser session yet. Complete an interview to track historical skill vectors.
                 </div>
-              ))}
+              ) : (
+                profile.sessionHistory.map((sess) => (
+                  <div key={sess.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{sess.targetRole}</span>
+                        <span className="rounded bg-zinc-800 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
+                          {sess.department}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 truncate max-w-md">
+                        Strength: {sess.topStrength}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 font-mono shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-purple-400">{sess.overallScore}/100</div>
+                        <div className="text-[10px] text-zinc-500">{sess.timestamp.split("T")[0]}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
