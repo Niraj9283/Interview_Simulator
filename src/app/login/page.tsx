@@ -202,6 +202,36 @@ export default function LoginPage() {
               </>
             )}
           </button>
+
+          {/* Quick Demo Login Option */}
+          <div className="relative my-4 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#262626]" />
+            </div>
+            <div className="relative bg-[#121212] px-3 text-[11px] font-mono uppercase text-[#737373]">
+              Or Quick Test
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={async () => {
+              setIsSubmitting(true);
+              setGeneralError("");
+              const result = await login("candidate@mockmate.ai", "DemoPassword123!", true);
+              setIsSubmitting(false);
+              if (result.success) {
+                router.push("/");
+              } else {
+                setGeneralError(result.error || "Unable to initialize demo session.");
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#2E2E2E] bg-[#181818] py-2.5 text-xs font-semibold text-[#F5F5F5] transition hover:border-[#FF4D3D]/60 hover:bg-[#202020] active:scale-[0.99] cursor-pointer"
+          >
+            <BrainCircuit size={15} className="text-[#FF4D3D]" />
+            <span>Instant Demo Candidate Access</span>
+          </button>
         </form>
 
         {/* Footer Link */}
