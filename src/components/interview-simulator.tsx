@@ -49,8 +49,14 @@ import {
   WifiOff,
   X,
   Zap,
+  LogIn,
+  LogOut,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { showToast } from "@/components/ui/toast";
 
 import {
   ABComparisonResult,
@@ -213,11 +219,14 @@ const DEFAULT_WEATHER_LOCATION = {
 };
 
 export default function InterviewSimulator() {
+  const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuth();
   const [profile, setProfile] = useState<CandidateProfile>(initialProfile);
   const [panelTheme, setPanelTheme] = useState<PanelTheme>("light");
   const [resumeFileName, setResumeFileName] = useState("sample-profile.txt");
   const [stage, setStage] = useState<Stage>("setup");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const isWorkspaceActive = isWorkspaceOpen && isAuthenticated;
   const [questions, setQuestions] = useState<string[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -298,6 +307,29 @@ export default function InterviewSimulator() {
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<number>(() => Date.now());
   const [voiceAnswerState, setVoiceAnswerState] = useState<VoiceAnswerState>("idle");
+
+  // Handler to enforce authentication before starting an interview session
+  const handleLaunchSimulator = () => {
+    if (!isAuthenticated || !user) {
+      showToast({
+        type: "warning",
+        title: "Sign In Required",
+        message: "Please sign in or create an account to start your mock interview.",
+      });
+      router.push("/login");
+      return;
+    }
+    if (user.full_name || user.name) {
+      const candidateName = user.full_name || user.name || "";
+      setProfile((prev) => ({
+        ...prev,
+        name: candidateName,
+        department: (user.department as DepartmentId) || prev.department,
+        targetRole: user.target_role || prev.targetRole,
+      }));
+    }
+    setIsWorkspaceOpen(true);
+  };
   const [voiceRecordingSeconds, setVoiceRecordingSeconds] = useState<number>(0);
   const [voiceTranscriptBundle, setVoiceTranscriptBundle] = useState<VoiceTranscriptBundle | null>(null);
   const voiceTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1313,7 +1345,55 @@ export default function InterviewSimulator() {
 
           <div className="flex flex-col gap-2 lg:items-end">
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              {isWorkspaceOpen && (
+              {/* Authentication Controls */}
+              <div className="flex items-center gap-1.5 mr-1">
+                {isAuthenticated && user ? (
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href="/settings/security"
+                      className="flex items-center gap-1.5 rounded-lg border border-[#262626] bg-[#151515] px-2.5 py-1 text-xs font-semibold text-[#F5F5F5] hover:border-[#FF4D3D]/50 transition"
+                      title="Account & Security"
+                    >
+                      <span className="size-2 rounded-full bg-emerald-400" />
+                      <span className="max-w-[110px] truncate">{user.name || user.email}</span>
+                    </Link>
+                    <Link
+                      href="/onboarding"
+                      className="hidden sm:inline-flex items-center rounded-lg border border-[#262626] bg-[#151515] px-2 py-1 text-xs text-[#A0A0A0] hover:text-white hover:border-[#333] transition"
+                      title="Setup Profile / Preferences"
+                    >
+                      Setup
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => logout()}
+                      className="flex items-center gap-1 rounded-lg border border-[#262626] bg-[#151515] px-2 py-1 text-xs text-[#A0A0A0] hover:text-[#FF4D3D] hover:border-[#FF4D3D]/40 transition cursor-pointer"
+                      title="Sign Out"
+                    >
+                      <LogOut size={12} />
+                      <span className="hidden sm:inline">Logout</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href="/login"
+                      className="flex items-center gap-1 rounded-lg border border-[#262626] bg-[#151515] px-2.5 py-1 text-xs font-semibold text-[#F5F5F5] hover:border-[#FF4D3D]/50 transition"
+                    >
+                      <LogIn size={12} className="text-[#FF4D3D]" />
+                      <span>Sign In</span>
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="flex items-center rounded-lg bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-2.5 py-1 text-xs font-bold text-white shadow-md shadow-[#FF4D3D]/20 hover:brightness-110 transition"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {isWorkspaceActive && (
                 <button
                   type="button"
                   onClick={handlePromptReset}
@@ -1339,7 +1419,7 @@ export default function InterviewSimulator() {
         </header>
 
         {/* Cinematic Hero Section (Setup Stage) */}
-        {!isWorkspaceOpen && (
+        {!isWorkspaceActive && (
           <section className="relative flex flex-1 flex-col justify-center overflow-hidden rounded-2xl border border-[#222222] bg-gradient-to-b from-[#141414] via-[#0e0e0e] to-[#080808] p-8 lg:p-14 shadow-2xl min-h-[65vh] animate-in fade-in duration-300">
             {/* Ambient Red Glow */}
             <div className="pointer-events-none absolute -right-16 -top-16 h-96 w-96 rounded-full bg-[#FF4D3D]/12 blur-[100px]" />
@@ -1369,24 +1449,52 @@ export default function InterviewSimulator() {
               </p>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsWorkspaceOpen(true)}
-                  className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-8 py-4 text-base font-bold text-white shadow-xl shadow-[#FF4D3D]/30 transition hover:brightness-110 active:scale-95 cursor-pointer"
-                >
-                  <Play size={18} fill="currentColor" />
-                  <span>Launch Live Simulator</span>
-                </button>
+              <div className="flex flex-col gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-4">
+                  {isAuthenticated && user ? (
+                    <button
+                      type="button"
+                      onClick={handleLaunchSimulator}
+                      className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-8 py-4 text-base font-bold text-white shadow-xl shadow-[#FF4D3D]/30 transition hover:brightness-110 active:scale-95 cursor-pointer"
+                    >
+                      <Play size={18} fill="currentColor" />
+                      <span>Launch Live Simulator</span>
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleLaunchSimulator}
+                        className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-8 py-4 text-base font-bold text-white shadow-xl shadow-[#FF4D3D]/30 transition hover:brightness-110 active:scale-95 cursor-pointer"
+                      >
+                        <LogIn size={18} />
+                        <span>Sign In to Launch Simulator</span>
+                      </button>
+                      <Link
+                        href="/register"
+                        className="flex items-center gap-2 rounded-xl border border-[#333333] bg-[#161616] px-6 py-4 text-sm font-semibold text-[#F5F5F5] hover:border-[#FF4D3D]/50 hover:bg-[#1c1c1c] transition"
+                      >
+                        <span>Create Free Account</span>
+                      </Link>
+                    </div>
+                  )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowEdgeModal(true)}
-                  className="flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#151515] px-6 py-4 text-sm font-semibold text-[#F5F5F5] transition hover:border-[#FF4D3D]/50 hover:bg-[#1c1c1c] active:scale-95 cursor-pointer"
-                >
-                  <Cpu size={16} className="text-[#FF4D3D]" />
-                  <span>Explore Edge Architecture</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEdgeModal(true)}
+                    className="flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#151515] px-6 py-4 text-sm font-semibold text-[#F5F5F5] transition hover:border-[#FF4D3D]/50 hover:bg-[#1c1c1c] active:scale-95 cursor-pointer"
+                  >
+                    <Cpu size={16} className="text-[#FF4D3D]" />
+                    <span>Explore Edge Architecture</span>
+                  </button>
+                </div>
+
+                {!isAuthenticated && (
+                  <p className="text-xs text-[#888888] font-mono flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-[#FF4D3D]" />
+                    <span>Authentication required to launch simulation, persist evaluations, and record voice analytics.</span>
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -1396,7 +1504,7 @@ export default function InterviewSimulator() {
           <EdgeArchitectureModal telemetry={edgeTelemetry} onClose={() => setShowEdgeModal(false)} />
         )}
 
-        {isWorkspaceOpen && (
+        {isWorkspaceActive && (
           <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px] animate-in fade-in duration-300">
           <aside className="flex flex-col gap-4 rounded-2xl border border-[#222222] bg-[#111111] p-4 shadow-xl text-[#F5F5F5] max-h-[calc(100vh-120px)] overflow-y-auto">
             <section>

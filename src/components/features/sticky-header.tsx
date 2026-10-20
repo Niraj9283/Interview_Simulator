@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { BrainCircuit, Search, Code2, Monitor, Sparkles, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import { BrainCircuit, Search, HelpCircle, LogIn, LogOut } from "lucide-react";
 import { DarkModeToggle } from "./dark-mode-toggle";
 import { MobileMenu } from "./mobile-menu";
 import { LastUpdatedBadge } from "./last-updated-badge";
+import { useAuth } from "@/lib/auth-context";
 
 interface StickyHeaderProps {
   onOpenSearch: () => void;
@@ -20,6 +22,7 @@ export function StickyHeader({
   children,
 }: StickyHeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -72,6 +75,12 @@ export function StickyHeader({
           >
             Simulator
           </button>
+          <Link
+            href="/onboarding"
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#A0A0A0] hover:text-[#F5F5F5] hover:bg-white/5 transition"
+          >
+            Setup Guide
+          </Link>
           <button
             type="button"
             onClick={onOpenFeedback}
@@ -100,6 +109,47 @@ export function StickyHeader({
               ⌘K
             </kbd>
           </button>
+
+          {/* Auth State */}
+          <div className="hidden sm:flex items-center gap-2">
+            {isAuthenticated && user ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/settings/security"
+                  className="flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#151515] px-3 py-1.5 text-xs font-medium text-[#F5F5F5] hover:border-[#FF4D3D]/40 transition"
+                  title="Security and Account Settings"
+                >
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  <span className="max-w-[120px] truncate">{user.name || user.email}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="flex size-9 items-center justify-center rounded-xl border border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-[#FF4D3D] hover:border-[#FF4D3D]/40 transition cursor-pointer"
+                  title="Log Out"
+                  aria-label="Log out"
+                >
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#151515] px-3 py-1.5 text-xs font-medium text-[#F5F5F5] hover:border-[#FF4D3D]/40 transition"
+                >
+                  <LogIn size={13} className="text-[#FF4D3D]" />
+                  <span>Sign In</span>
+                </Link>
+                <Link
+                  href="/register"
+                  className="flex items-center rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-[#FF4D3D]/20 hover:brightness-110 transition"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
 
           {/* Children passed in (e.g. edge mode or custom toggles) */}
           {children}

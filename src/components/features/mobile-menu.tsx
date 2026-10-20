@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Menu,
   X,
@@ -11,9 +12,12 @@ import {
   ShieldCheck,
   HelpCircle,
   MessageSquare,
-  Sparkles,
+  LogIn,
+  LogOut,
+  Compass,
 } from "lucide-react";
 import { DarkModeToggle } from "./dark-mode-toggle";
+import { useAuth } from "@/lib/auth-context";
 
 interface MobileMenuProps {
   onOpenSearch: () => void;
@@ -22,6 +26,7 @@ interface MobileMenuProps {
 
 export function MobileMenu({ onOpenSearch, onOpenFeedback }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
 
   // Close on Escape key
   useEffect(() => {
@@ -173,6 +178,73 @@ export function MobileMenu({ onOpenSearch, onOpenFeedback }: MobileMenuProps) {
                   </button>
                 );
               })}
+              {/* Account Section */}
+              <div className="mt-4 border-t border-[#222222] pt-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#A0A0A0] px-2 py-1">
+                  Account & Profile
+                </div>
+                {isAuthenticated && user ? (
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <div className="flex items-center gap-2.5 rounded-lg bg-[#161616] p-2.5 border border-[#222222]">
+                      <div className="size-8 rounded-full bg-[#FF4D3D]/15 text-[#FF4D3D] grid place-items-center font-bold text-xs shrink-0">
+                        {user.name ? user.name[0].toUpperCase() : "U"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white truncate">{user.name || "Candidate"}</div>
+                        <div className="text-[10px] text-zinc-400 truncate">{user.email}</div>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${user.email_verified ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                        {user.email_verified ? "Verified" : "Unverified"}
+                      </span>
+                    </div>
+                    <Link
+                      href="/onboarding"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#A0A0A0] hover:bg-white/5 hover:text-[#F5F5F5] transition"
+                    >
+                      <Compass size={16} className="text-[#FF4D3D]" />
+                      <span>Onboarding Setup</span>
+                    </Link>
+                    <Link
+                      href="/settings/security"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-[#A0A0A0] hover:bg-white/5 hover:text-[#F5F5F5] transition"
+                    >
+                      <ShieldCheck size={16} className="text-[#FF4D3D]" />
+                      <span>Security & Delete Account</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                    >
+                      <LogOut size={16} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <Link
+                      href="/login"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-[#262626] bg-[#151515] py-2.5 text-xs font-semibold text-white hover:border-[#FF4D3D]/50 transition"
+                    >
+                      <LogIn size={14} className="text-[#FF4D3D]" />
+                      <span>Sign In</span>
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center justify-center rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] py-2.5 text-xs font-bold text-white shadow-md shadow-[#FF4D3D]/20 transition"
+                    >
+                      Create Free Account
+                    </Link>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Footer with Dark mode toggle & version */}

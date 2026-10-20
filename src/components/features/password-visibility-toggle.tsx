@@ -3,7 +3,33 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 
-interface PasswordVisibilityToggleProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface PasswordVisibilityToggleProps {
+  isVisible: boolean;
+  onToggle: () => void;
+  className?: string;
+  ariaLabel?: string;
+}
+
+export function PasswordVisibilityToggle({
+  isVisible,
+  onToggle,
+  className = "",
+  ariaLabel,
+}: PasswordVisibilityToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 transition cursor-pointer ${className}`}
+      aria-label={ariaLabel || (isVisible ? "Hide password" : "Show password")}
+      title={ariaLabel || (isVisible ? "Hide password" : "Show password")}
+    >
+      {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  );
+}
+
+export interface PasswordVisibilityInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: boolean;
@@ -16,7 +42,7 @@ export function PasswordVisibilityInput({
   className = "",
   id,
   ...props
-}: PasswordVisibilityToggleProps) {
+}: PasswordVisibilityInputProps) {
   const [showPassword, setShowPassword] = useState(false);
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
@@ -41,15 +67,11 @@ export function PasswordVisibilityInput({
             icon ? "pl-9" : "pl-3.5"
           } pr-10 ${error ? "!border-rose-500/70 !ring-rose-500/30" : ""} ${className}`}
         />
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 grid size-7 place-items-center rounded-lg text-zinc-400 hover:text-white transition cursor-pointer"
-          aria-label={showPassword ? "Hide password or token" : "Show password or token"}
-          title={showPassword ? "Hide password or token" : "Show password or token"}
-        >
-          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
+        <PasswordVisibilityToggle
+          isVisible={showPassword}
+          onToggle={() => setShowPassword(!showPassword)}
+          className="absolute right-3 grid size-7 place-items-center"
+        />
       </div>
       {error && <p className="text-[11px] font-medium text-rose-400">{error}</p>}
     </div>

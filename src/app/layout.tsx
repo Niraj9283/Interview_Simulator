@@ -5,6 +5,8 @@ import "./globals.css";
 import InteractiveBackground from "@/components/interactive-background";
 import { AppFeatureShell } from "@/components/features/app-feature-shell";
 import { StructuredData } from "@/components/seo/structured-data";
+import { AuthProvider } from "@/lib/auth-context";
+import { Analytics } from "@vercel/analytics/react";
 
 // Feature #21: Font Optimization via next/font with zero external requests & swap display
 const sansFont = Plus_Jakarta_Sans({
@@ -119,7 +121,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full font-sans">
         <InteractiveBackground />
-        <AppFeatureShell>{children}</AppFeatureShell>
+        <AuthProvider>
+          <AppFeatureShell>{children}</AppFeatureShell>
+        </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );

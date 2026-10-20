@@ -292,7 +292,7 @@ describe("Interview Question Generation - Scenarios A through L", () => {
       department: "Finance",
       targetRole: "NonExistentRoleXYZ",
       domain: "System Design" as unknown as InterviewTrack,
-      interviewType: "Coding" as unknown as any,
+      interviewType: "Coding" as unknown as never,
     });
     const safeQ = generateQuestion(invalidProfile, 0, []);
 

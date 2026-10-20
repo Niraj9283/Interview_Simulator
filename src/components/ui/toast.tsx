@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -75,6 +75,30 @@ export const toast = {
     toastManager.show({ type: "warning", title, message }),
   dismiss: (id: string) => toastManager.dismiss(id),
 };
+
+export function showToast(
+  optionsOrMessage: string | { type: ToastType | string; title: string; message: string; duration?: number },
+  type: ToastType = "info",
+  title?: string
+): string {
+  if (typeof optionsOrMessage === "object") {
+    const validTypes: ToastType[] = ["success", "error", "warning", "info"];
+    const resolvedType = validTypes.includes(optionsOrMessage.type as ToastType)
+      ? (optionsOrMessage.type as ToastType)
+      : "info";
+    return toastManager.show({
+      type: resolvedType,
+      title: optionsOrMessage.title,
+      message: optionsOrMessage.message,
+      duration: optionsOrMessage.duration,
+    });
+  }
+  return toastManager.show({
+    type,
+    title: title || (type === "success" ? "Success" : type === "error" ? "Error" : "Notice"),
+    message: optionsOrMessage,
+  });
+}
 
 export function ToastContainer() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);

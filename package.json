@@ -9,8 +9,8 @@
     "lint": "eslint",
     "test": "npx -y tsx --test tests/interview-generation.test.ts",
     "test:feedback": "npx -y tsx --test tests/feedback-api.test.ts",
-    "test:all": "npx -y tsx --test tests/interview-generation.test.ts tests/feedback-api.test.ts tests/digital-profile.test.ts",
-    "test:backend": "backend\\.venv\\Scripts\\python.exe -m unittest backend/tests/test_interview_engine.py"
+    "test:all": "npx -y tsx --test tests/interview-generation.test.ts tests/feedback-api.test.ts tests/digital-profile.test.ts tests/auth-and-validation.test.ts",
+    "test:backend": "backend\\.venv\\Scripts\\python.exe -m unittest discover -s backend/tests"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",

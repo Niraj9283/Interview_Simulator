@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   BrainCircuit,
   Sliders,
@@ -178,28 +179,39 @@ export function SiteFooter() {
                 </button>
               </li>
               <li>
-                <span className="flex items-center gap-1.5 text-neutral-300">
-                  <ShieldCheck size={13} className="text-emerald-400" />
-                  <span>WASM Sandboxing</span>
-                </span>
-              </li>
-              <li>
-                <span className="flex items-center gap-1.5 text-neutral-300">
-                  <Lock size={13} className="text-sky-400" />
-                  <span>Zero-Storage Camera Policy</span>
-                </span>
-              </li>
-              <li>
-                <a
-                  href="#privacy"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openCookiePreferencesModal();
-                  }}
-                  className="hover:text-white transition cursor-pointer"
+                <Link
+                  href="/privacy"
+                  className="hover:text-white transition flex items-center gap-1.5"
                 >
-                  Privacy Policy & Telemetry
-                </a>
+                  <ShieldCheck size={13} className="text-emerald-400" />
+                  <span>Privacy Policy & Telemetry</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/terms"
+                  className="hover:text-white transition flex items-center gap-1.5"
+                >
+                  <Lock size={13} className="text-sky-400" />
+                  <span>Terms of Service</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/settings/security"
+                  className="hover:text-white transition flex items-center gap-1.5"
+                >
+                  <Sliders size={13} className="text-[#FF4D3D]" />
+                  <span>Security & Account Settings</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/login"
+                  className="hover:text-white transition"
+                >
+                  Account Login & Registration
+                </Link>
               </li>
             </ul>
           </div>

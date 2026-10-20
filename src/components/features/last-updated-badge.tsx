@@ -29,18 +29,20 @@ export function LastUpdatedBadge({
   prefix = "Last updated",
   className = "",
 }: LastUpdatedBadgeProps) {
-  const [mounted, setMounted] = useState(false);
-  const [relativeTime, setRelativeTime] = useState("Just now");
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const targetDate = React.useMemo(() => {
     if (!timestamp) return new Date();
     return typeof timestamp === "number" || typeof timestamp === "string"
       ? new Date(timestamp)
       : timestamp;
   }, [timestamp]);
+  const [relativeTime, setRelativeTime] = useState(() => getRelativeTime(targetDate));
 
   useEffect(() => {
-    setMounted(true);
-    setRelativeTime(getRelativeTime(targetDate));
     const timer = setInterval(() => {
       setRelativeTime(getRelativeTime(targetDate));
     }, 1000);

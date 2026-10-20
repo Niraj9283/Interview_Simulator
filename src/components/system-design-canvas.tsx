@@ -43,6 +43,14 @@ const NODE_ICONS: Record<ArchitecturalNodeType, typeof Server> = {
   search_index: Search,
 };
 
+function generateNodeId(): string {
+  return `node-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+}
+
+function generateEdgeId(): string {
+  return `edge-${Date.now()}`;
+}
+
 interface SystemDesignCanvasProps {
   diagram: ArchitectureDiagram;
   onChange: (diagram: ArchitectureDiagram) => void;
@@ -68,13 +76,14 @@ export function SystemDesignCanvas({
   // Handle Add Node
   function handleAddNode(type: ArchitecturalNodeType) {
     const def = ARCHITECTURAL_NODE_DEFS[type];
+    const nodeCount = diagram.nodes.length;
     const newNode: ArchitecturalNode = {
-      id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      id: generateNodeId(),
       type,
       label: def.label,
       sublabel: def.defaultSublabel,
-      x: 100 + (diagram.nodes.length % 5) * 60 + Math.random() * 30,
-      y: 80 + Math.floor(diagram.nodes.length / 5) * 70 + Math.random() * 20,
+      x: 100 + (nodeCount % 5) * 60 + ((nodeCount * 17) % 30),
+      y: 80 + Math.floor(nodeCount / 5) * 70 + ((nodeCount * 13) % 20),
     };
 
     onChange({
@@ -99,7 +108,7 @@ export function SystemDesignCanvas({
       if (connectingFromNodeId !== nodeId) {
         // Create Edge
         const newEdge = {
-          id: `edge-${Date.now()}`,
+          id: generateEdgeId(),
           from: connectingFromNodeId,
           to: nodeId,
           label: "Data Flow",

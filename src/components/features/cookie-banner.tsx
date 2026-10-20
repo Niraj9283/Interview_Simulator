@@ -23,11 +23,29 @@ export function openCookiePreferencesModal() {
 export function CookieBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
-  const [preferences, setPreferences] = useState<CookiePreferences>({
-    essential: true, // Always true
-    analytics: true,
-    modelCache: true,
-    personalization: true,
+  const [preferences, setPreferences] = useState<CookiePreferences>(() => {
+    if (typeof window === "undefined") {
+      return {
+        essential: true,
+        analytics: true,
+        modelCache: true,
+        personalization: true,
+      };
+    }
+    try {
+      const stored = localStorage.getItem(COOKIE_STORAGE_KEY);
+      if (stored) {
+        return { ...JSON.parse(stored), essential: true };
+      }
+    } catch {
+      // Storage unavailable
+    }
+    return {
+      essential: true,
+      analytics: true,
+      modelCache: true,
+      personalization: true,
+    };
   });
 
   useEffect(() => {
@@ -36,9 +54,6 @@ export function CookieBanner() {
       if (!stored) {
         const timer = setTimeout(() => setIsVisible(true), 1000);
         return () => clearTimeout(timer);
-      } else {
-        const parsed = JSON.parse(stored);
-        setPreferences((prev) => ({ ...prev, ...parsed, essential: true }));
       }
     } catch {
       // Storage unavailable

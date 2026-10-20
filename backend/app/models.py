@@ -209,6 +209,7 @@ class UserRegisterRequest(BaseModel):
 class UserLoginRequest(BaseModel):
     email: str = Field(min_length=5, max_length=120)
     password: str = Field(min_length=1, max_length=128)
+    remember_me: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -216,6 +217,8 @@ class TokenResponse(BaseModel):
     token_type: str = "Bearer"
     email: str
     role: str
+    email_verified: bool = False
+    onboarding_completed: bool = False
     expires_in_hours: int = 24
 
 
@@ -225,7 +228,56 @@ class UserResponse(BaseModel):
     full_name: str
     role: str
     is_active: bool = True
+    email_verified: bool = False
+    onboarding_completed: bool = False
+    target_role: str | None = None
+    experience_level: str | None = None
+    department: str | None = None
     created_at: str | None = None
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=256)
+
+
+class ResendVerificationRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=120)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=120)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=256)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class OnboardingUpdateRequest(BaseModel):
+    target_role: str = Field(min_length=1, max_length=120)
+    department: str = Field(min_length=1, max_length=60)
+    experience_level: str = Field(min_length=1, max_length=60)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    confirmation: str = Field(min_length=1, max_length=64)
+
+
+class UserSessionSummary(BaseModel):
+    session_id: str
+    role: str
+    department: str
+    difficulty: str
+    score: int
+    completed: bool
+    created_at: str
+    updated_at: str
 
 
 class AdminMetricsResponse(BaseModel):

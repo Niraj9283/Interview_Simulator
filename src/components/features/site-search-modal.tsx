@@ -177,10 +177,21 @@ export function SiteSearchModal({
     );
   }, [items, query]);
 
-  // Reset selectedIndex when filter changes
+  // Focus input on open
   useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleClose = () => {
+    setQuery("");
     setSelectedIndex(0);
-  }, [filtered.length]);
+    onClose();
+  };
+
+  const activeIndex = selectedIndex >= filtered.length ? 0 : selectedIndex;
 
   // Keyboard navigation
   useEffect(() => {
@@ -189,7 +200,7 @@ export function SiteSearchModal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        handleClose();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1 < filtered.length ? prev + 1 : 0));
@@ -198,24 +209,16 @@ export function SiteSearchModal({
         setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filtered.length - 1));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (filtered[selectedIndex]) {
-          filtered[selectedIndex].action();
+        if (filtered[activeIndex]) {
+          filtered[activeIndex].action();
+          handleClose();
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, filtered, selectedIndex, onClose]);
-
-  // Focus input on open
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      setQuery("");
-    }
-  }, [isOpen]);
+  }, [isOpen, filtered, activeIndex]);
 
   if (!isOpen) return null;
 
@@ -229,7 +232,7 @@ export function SiteSearchModal({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-md transition-opacity"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal Dialog */}
@@ -241,14 +244,20 @@ export function SiteSearchModal({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
             placeholder="Search interview tracks, features, FAQs, or shortcuts... (↑↓ to navigate)"
             className="w-full bg-transparent text-sm text-[#F5F5F5] placeholder:text-neutral-500 focus:outline-none"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setQuery("");
+                setSelectedIndex(0);
+              }}
               className="text-neutral-400 hover:text-white p-1"
             >
               <X size={16} />

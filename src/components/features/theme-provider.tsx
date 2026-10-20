@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -13,43 +13,52 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    media.removeEventListener("change", callback);
+  };
+}
 
-  useEffect(() => {
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "dark";
     try {
-      const storedTheme = localStorage.getItem("mockmate_theme") as Theme | null;
-      if (storedTheme && ["dark", "light", "system"].includes(storedTheme)) {
-        setThemeState(storedTheme);
-      }
+      const stored = localStorage.getItem("mockmate_theme") as Theme | null;
+      if (stored && ["dark", "light", "system"].includes(stored)) return stored;
     } catch {
-      // ignore storage errors
+      // ignore
     }
-  }, []);
+    return "dark";
+  });
+
+  const isClient = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false
+  );
+
+  const resolvedTheme: "dark" | "light" =
+    theme === "system"
+      ? isClient && window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : theme;
 
   useEffect(() => {
     const root = document.documentElement;
-    let actualTheme: "dark" | "light" = "dark";
-
-    if (theme === "system") {
-      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      actualTheme = systemDark ? "dark" : "light";
-    } else {
-      actualTheme = theme;
-    }
-
-    setResolvedTheme(actualTheme);
-    root.setAttribute("data-theme", actualTheme);
-
-    if (actualTheme === "dark") {
+    root.setAttribute("data-theme", resolvedTheme);
+    if (resolvedTheme === "dark") {
       root.classList.add("dark");
       root.classList.remove("light");
     } else {
       root.classList.add("light");
       root.classList.remove("dark");
     }
-  }, [theme]);
+  }, [resolvedTheme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
