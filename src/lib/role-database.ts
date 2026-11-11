@@ -1,4 +1,4 @@
-import rawRoleDatabase from "../../data/interview-role-database.json" with { type: "json" };
+import rawRoleDatabase from "../../backend/app/resources/interview-role-database.json" with { type: "json" };
 
 export type DepartmentId = "Technical" | "Finance" | "HR" | "Marketing";
 

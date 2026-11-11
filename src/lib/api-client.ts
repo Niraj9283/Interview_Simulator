@@ -70,6 +70,7 @@ export function normalizeErrorMessage(status: number, rawData?: Record<string, u
     case 500:
     case 502:
     case 503:
+    case 504:
       return "Service temporarily unavailable. Please try again shortly.";
     default:
       return "An unexpected error occurred. Please refresh or try again.";
@@ -96,6 +97,9 @@ export async function apiFetch<T = unknown>(
   const fetchOptions: RequestInit = {
     ...options,
     headers,
+    signal: options.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(20_000)])
+      : AbortSignal.timeout(20_000),
     credentials: options.credentials || "include",
   };
 
@@ -109,6 +113,7 @@ export async function apiFetch<T = unknown>(
       try {
         data = await response.json();
       } catch {
+        if (fetchOptions.signal?.aborted) throw fetchOptions.signal.reason;
         data = null;
       }
     } else {
@@ -135,6 +140,9 @@ export async function apiFetch<T = unknown>(
   } catch (err: unknown) {
     if (err instanceof ApiError) {
       throw err;
+    }
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new ApiError(504, "The server took too long to respond. Please try again shortly.", undefined, requestId);
     }
     // Network failures / offline errors
     throw new ApiError(

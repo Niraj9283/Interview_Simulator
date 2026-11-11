@@ -37,7 +37,7 @@ STOP_WORDS = {
     "your",
 }
 
-ROLE_DATABASE_PATH = Path(__file__).resolve().parents[3] / "data" / "interview-role-database.json"
+ROLE_DATABASE_PATH = Path(__file__).resolve().parents[1] / "resources" / "interview-role-database.json"
 
 
 def load_role_database() -> dict:

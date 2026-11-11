@@ -47,7 +47,7 @@ class Settings:
     )
 
     # Database Configuration
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    DATABASE_URL: str = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL", "")
     BACKUP_DIR: Path = Path(os.getenv("BACKUP_DIR", str(Path(__file__).resolve().parents[1] / "data" / "backups")))
 
     # Email Delivery (Resend / SMTP)

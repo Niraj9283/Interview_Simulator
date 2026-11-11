@@ -1,6 +1,6 @@
 """
 Secure Database Subsystem with User Isolation & Migrations
-SQLite engine using parameterized queries exclusively (zero SQL-injection vulnerability).
+PostgreSQL in production; SQLite for local development, with bound parameters.
 Enforces foreign keys, cascade deletes, data isolation per user, and audit access logs.
 """
 
@@ -15,20 +15,32 @@ from app.config import settings
 from app.security import hash_password, hash_token, verify_password, verify_token_hash
 
 DB_PATH = Path(__file__).resolve().parents[1] / "data" / "mockmate_users.db"
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 from contextlib import contextmanager
 
 @contextmanager
 def get_db_connection(db_file: Path | str | None = None):
-    """Yields a SQLite connection with foreign keys and row factory enabled, closing it upon exit."""
-    target_path = str(db_file or DB_PATH)
-    conn = sqlite3.connect(target_path)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    conn.row_factory = sqlite3.Row
+    """Open a durable PostgreSQL connection, or explicit/local SQLite database."""
+    if db_file is None and settings.DATABASE_URL.startswith(("postgres://", "postgresql://")):
+        from app.postgres import connect
+        conn = connect(settings.DATABASE_URL)
+    else:
+        if db_file is None and os.getenv("VERCEL"):
+            raise RuntimeError("Configure a PostgreSQL DATABASE_URL for Vercel; local SQLite is not durable")
+        if db_file is None and settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite:///"):
+            raise ValueError("Unsupported DATABASE_URL scheme")
+        target = db_file or (settings.DATABASE_URL.removeprefix("sqlite:///") if settings.DATABASE_URL else DB_PATH)
+        target_path = Path(target)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(target_path))
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.row_factory = sqlite3.Row
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -36,7 +48,10 @@ def get_db_connection(db_file: Path | str | None = None):
 def _run_migrations(conn: sqlite3.Connection) -> None:
     """Safely upgrades table schema with backwards compatibility for existing columns."""
     cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(users)")
+    if isinstance(conn, sqlite3.Connection):
+        cursor.execute("PRAGMA table_info(users)")
+    else:
+        cursor.execute("SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'users'")
     existing_cols = {row["name"] for row in cursor.fetchall()}
 
     columns_to_add = [
@@ -62,6 +77,10 @@ def init_database(db_file: Path | str | None = None) -> None:
     """Initializes the database schema and seeds the default admin user securely."""
     with get_db_connection(db_file) as conn:
         cursor = conn.cursor()
+
+        if not isinstance(conn, sqlite3.Connection):
+            # Serialize schema setup across concurrent serverless cold starts.
+            cursor.execute("SELECT pg_advisory_xact_lock(71426011)")
 
         # Users table with strict constraints
         cursor.execute("""
@@ -169,10 +188,11 @@ def init_database(db_file: Path | str | None = None) -> None:
                 """
                 INSERT INTO users (email, full_name, hashed_password, role, is_active, email_verified, onboarding_completed)
                 VALUES (?, ?, ?, ?, ?, 1, 1)
+                ON CONFLICT(email) DO NOTHING
                 """,
                 ("admin@mockmate.ai", "System Administrator", hashed, "admin", 1),
             )
-            conn.commit()
+        conn.commit()
 
 
 # ============================================================================
@@ -204,6 +224,7 @@ def create_user(
                 token_version
             )
             VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 1)
+            RETURNING id
             """,
             (
                 clean_email,
@@ -216,8 +237,8 @@ def create_user(
                 now if verification_token_hash else None,
             ),
         )
+        user_id = cursor.fetchone()["id"]
         conn.commit()
-        user_id = cursor.lastrowid
 
     return {
         "id": user_id,
@@ -655,11 +676,12 @@ def save_user_resume(
             """
             INSERT INTO user_resumes (user_id, filename, extracted_skills, summary)
             VALUES (?, ?, ?, ?)
+            RETURNING id
             """,
             (user_id, filename, json.dumps(skills), summary),
         )
+        resume_id = cursor.fetchone()["id"]
         conn.commit()
-        resume_id = cursor.lastrowid
     return {
         "id": resume_id,
         "filename": filename,
@@ -679,7 +701,7 @@ def get_user_resumes(user_id: int) -> list[dict[str, Any]]:
             WHERE user_id = ?
             ORDER BY uploaded_at DESC
             """,
-            (user_id),
+            (user_id,),
         )
         rows = []
         for r in cursor.fetchall():

@@ -2,7 +2,15 @@
   "services": {
     "frontend": {
       "root": ".",
-      "framework": "nextjs"
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "backend",
+          "format": "url",
+          "env": "AUTH_BACKEND_URL"
+        }
+      ]
     },
     "backend": {
       "root": "backend",

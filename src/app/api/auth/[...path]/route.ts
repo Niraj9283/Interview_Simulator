@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Backend API URL (server-to-server)
-const BACKEND_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Keep the upstream deadline shorter than the browser deadline.
+export const maxDuration = 30;
 
 async function proxyAuthRequest(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
   const pathSegment = resolvedParams.path ? resolvedParams.path.join("/") : "";
-  const backendTarget = `${BACKEND_URL}/api/auth/${pathSegment}`;
+
 
   const requestHeaders = new Headers();
   const tokenCookie = req.cookies.get("mockmate_token");
+
+  // Anonymous visitors do not need a backend round trip.
+  if (pathSegment === "me" && req.method === "GET" && !tokenCookie?.value) {
+    return NextResponse.json({ detail: "Not authenticated" }, { status: 401 });
+  }
 
   // Forward authorization header if cookie is present
   if (tokenCookie?.value) {
@@ -39,10 +44,22 @@ async function proxyAuthRequest(req: NextRequest, { params }: { params: Promise<
   }
 
   try {
+    // Vercel injects this binding at runtime; never call the public frontend
+    // origin as the backend, which would recurse through this same route.
+    const backendUrl = process.env.AUTH_BACKEND_URL || process.env.INTERNAL_API_URL ||
+      (process.env.NODE_ENV !== "production" ? "http://localhost:8000" : undefined);
+    if (!backendUrl) throw new Error("Authentication backend is not configured");
+    const backendTarget = new URL(`${backendUrl.replace(/\/$/, "")}/api/auth/${pathSegment}`);
+    if (backendTarget.origin === req.nextUrl.origin && backendTarget.pathname === req.nextUrl.pathname) {
+      throw new Error("Authentication backend points to the frontend");
+    }
     const backendResponse = await fetch(backendTarget, {
       method: req.method,
       headers: requestHeaders,
       body: bodyContent,
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+      redirect: "error",
     });
 
     const isJson = backendResponse.headers.get("content-type")?.includes("application/json");
@@ -50,7 +67,8 @@ async function proxyAuthRequest(req: NextRequest, { params }: { params: Promise<
     if (isJson) {
       try {
         responseData = await backendResponse.json();
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw error;
         responseData = {};
       }
     } else {
@@ -64,6 +82,8 @@ async function proxyAuthRequest(req: NextRequest, { params }: { params: Promise<
         status: backendResponse.status,
         headers: {
           "X-Request-ID": requestId,
+          "Cache-Control": "no-store",
+          ...(backendResponse.headers.has("retry-after") ? { "Retry-After": backendResponse.headers.get("retry-after")! } : {}),
         },
       }
     );
@@ -88,179 +108,19 @@ async function proxyAuthRequest(req: NextRequest, { params }: { params: Promise<
     }
 
     // 2. If logout or delete-account succeeded, clear HttpOnly cookie
-    if (pathSegment === "logout" || pathSegment === "delete-account") {
+    if (backendResponse.ok && (pathSegment === "logout" || pathSegment === "delete-account")) {
       clientResponse.cookies.delete("mockmate_token");
     }
 
     return clientResponse;
   } catch (err: unknown) {
-    console.warn(`[Auth Proxy Info]: Backend server at ${BACKEND_URL} is unreachable. Activating serverless fallback mode.`, err);
-
-    const isProduction = process.env.NODE_ENV === "production";
-
-    // Graceful Edge/Serverless Fallback for Vercel/Cloud Deployments
-    if (pathSegment === "login" && req.method === "POST") {
-      let email = "candidate@mockmate.ai";
-      try {
-        if (bodyContent) {
-          const parsed = JSON.parse(bodyContent);
-          if (parsed.email) email = parsed.email;
-        }
-      } catch {
-        // use default email
-      }
-
-      const displayName = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Demo Candidate";
-      const demoToken = `mockmate_edge_${Buffer.from(email).toString("base64")}_${Date.now()}`;
-      const expiresHours = 168;
-
-      const clientResponse = NextResponse.json(
-        {
-          access_token: demoToken,
-          token_type: "bearer",
-          expires_in_hours: expiresHours,
-          message: "Signed in successfully (Edge Mode).",
-          user: {
-            id: 1,
-            email: email,
-            full_name: displayName,
-            name: displayName,
-            role: "candidate",
-            email_verified: true,
-            onboarding_completed: true,
-            target_role: "Senior Full-Stack Engineer",
-            department: "Engineering",
-            experience_level: "Senior",
-          },
-        },
-        { status: 200 }
-      );
-
-      clientResponse.cookies.set({
-        name: "mockmate_token",
-        value: demoToken,
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: "lax",
-        path: "/",
-        maxAge: expiresHours * 3600,
-        expires: new Date(Date.now() + expiresHours * 3600 * 1000),
-      });
-
-      return clientResponse;
-    }
-
-    if (pathSegment === "register" && req.method === "POST") {
-      let email = "new.candidate@mockmate.ai";
-      let fullName = "Candidate User";
-      let role = "candidate";
-      try {
-        if (bodyContent) {
-          const parsed = JSON.parse(bodyContent);
-          if (parsed.email) email = parsed.email;
-          if (parsed.full_name) fullName = parsed.full_name;
-          if (parsed.role) role = parsed.role;
-        }
-      } catch {
-        // default fallback
-      }
-
-      const demoToken = `mockmate_edge_${Buffer.from(email).toString("base64")}_${Date.now()}`;
-      const expiresHours = 168;
-
-      const clientResponse = NextResponse.json(
-        {
-          access_token: demoToken,
-          token_type: "bearer",
-          expires_in_hours: expiresHours,
-          message: "Registration successful. Welcome to MockMate AI!",
-          user: {
-            id: 1,
-            email: email,
-            full_name: fullName,
-            name: fullName,
-            role: role,
-            email_verified: true,
-            onboarding_completed: false,
-          },
-        },
-        { status: 201 }
-      );
-
-      clientResponse.cookies.set({
-        name: "mockmate_token",
-        value: demoToken,
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: "lax",
-        path: "/",
-        maxAge: expiresHours * 3600,
-        expires: new Date(Date.now() + expiresHours * 3600 * 1000),
-      });
-
-      return clientResponse;
-    }
-
-    if (pathSegment === "me" && req.method === "GET") {
-      if (!tokenCookie?.value) {
-        return NextResponse.json({ detail: "Not authenticated" }, { status: 401 });
-      }
-
-      let email = "candidate@mockmate.ai";
-      try {
-        if (tokenCookie.value.startsWith("mockmate_edge_")) {
-          const parts = tokenCookie.value.split("_");
-          if (parts[2]) {
-            email = Buffer.from(parts[2], "base64").toString("utf-8");
-          }
-        }
-      } catch {
-        email = "candidate@mockmate.ai";
-      }
-
-      const displayName = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Demo Candidate";
-
-      return NextResponse.json({
-        id: 1,
-        email: email,
-        full_name: displayName,
-        name: displayName,
-        role: "candidate",
-        email_verified: true,
-        onboarding_completed: true,
-        target_role: "Senior Full-Stack Engineer",
-        department: "Engineering",
-        experience_level: "Senior",
-      });
-    }
-
-    if (pathSegment === "logout" || pathSegment === "delete-account") {
-      const clientResponse = NextResponse.json({ message: "Successfully signed out." });
-      clientResponse.cookies.delete("mockmate_token");
-      return clientResponse;
-    }
-
-    if (pathSegment === "forgot-password" || pathSegment === "resend-verification" || pathSegment === "reset-password") {
-      return NextResponse.json({
-        success: true,
-        message: "Instructions have been simulated successfully (Edge Sandbox Mode).",
-      });
-    }
-
-    if (pathSegment === "onboarding" || pathSegment === "change-password") {
-      return NextResponse.json({
-        success: true,
-        message: "Preferences updated successfully (Edge Sandbox Mode).",
-      });
-    }
-
-    // Default error response if unknown endpoint
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    console.warn(`[Auth Proxy] ${requestId}: ${timedOut ? "upstream timeout" : "upstream unavailable"}`);
     return NextResponse.json(
-      {
-        error: "Backend Service Unavailable",
-        message: "Unable to communicate with the authentication service. Please ensure the backend server is running.",
-      },
-      { status: 503 }
+      { detail: timedOut
+        ? "The authentication service took too long to respond. Please try again shortly."
+        : "The authentication service is unavailable. Please try again shortly." },
+      { status: timedOut ? 504 : 503, headers: { "X-Request-ID": requestId, "Cache-Control": "no-store" } }
     );
   }
 }

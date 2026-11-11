@@ -18,6 +18,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Any
 
 from fastapi import (
@@ -82,8 +83,6 @@ from app.services.email_service import (
     send_password_reset_email,
     send_verification_email,
 )
-from app.services.interview_engine import InterviewEngine
-from app.services.rag_engine import RAGEngine
 from app.user_db import (
     authenticate_user,
     create_user,
@@ -147,8 +146,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-rag_engine = RAGEngine()
-engine = InterviewEngine(rag_engine=rag_engine)
+# Authentication must not depend on Chroma startup or embedding downloads.
+@lru_cache(maxsize=1)
+def get_rag_engine():
+    from app.services.rag_engine import RAGEngine
+    return RAGEngine()
+
+
+@lru_cache(maxsize=1)
+def get_interview_engine():
+    from app.services.interview_engine import InterviewEngine
+    return InterviewEngine(rag_engine=get_rag_engine())
 
 # ============================================================================
 # Security Middlewares (Ordered)
@@ -634,13 +642,13 @@ async def list_user_resumes(
 async def get_admin_metrics(
     admin_user: dict[str, Any] = Depends(require_admin),
 ) -> AdminMetricsResponse:
-    status_info = rag_engine.get_status()
+    status_info = get_rag_engine().get_status()
     all_users = list_users()
 
     return AdminMetricsResponse(
         status="operational",
         environment=settings.ENV,
-        active_sessions=len(engine.sessions),
+        active_sessions=len(get_interview_engine().sessions),
         registered_users=len(all_users),
         rag_collections={
             "candidate_knowledge": status_info["collections"].get("candidate_knowledge", {}).get("count", 0),
@@ -691,7 +699,7 @@ async def clean_candidate_rag(
 
 @app.get("/api/rag/status", response_model=RAGStatusResponse)
 async def get_rag_status() -> RAGStatusResponse:
-    status_info = rag_engine.get_status()
+    status_info = get_rag_engine().get_status()
     return RAGStatusResponse(status=status_info["status"], collections=status_info["collections"])
 
 
@@ -716,7 +724,7 @@ async def upload_resume_rag(
         safe_filename = sanitize_filename(file.filename)
         if safe_filename.lower().endswith(".pdf"):
             try:
-                text = rag_engine.extract_text_from_pdf(content)
+                text = get_rag_engine().extract_text_from_pdf(content)
             except ValueError as err:
                 raise HTTPException(status_code=400, detail=str(err)) from err
         else:
@@ -728,9 +736,9 @@ async def upload_resume_rag(
     if not text.strip():
         raise HTTPException(status_code=400, detail="No readable text or PDF provided in resume upload.")
 
-    chunks_count = rag_engine.index_resume(text, candidate_name=clean_candidate_name)
-    skills = rag_engine._extract_skills_from_text(text)
-    keywords, summary = engine.analyze_resume(text, "Candidate Role")
+    chunks_count = get_rag_engine().index_resume(text, candidate_name=clean_candidate_name)
+    skills = get_rag_engine()._extract_skills_from_text(text)
+    keywords, summary = get_interview_engine().analyze_resume(text, "Candidate Role")
 
     # Link resume to authenticated user if logged in
     if current_user and current_user.get("user_id"):
@@ -754,7 +762,7 @@ async def upload_resume_rag(
 async def query_rag(payload: RAGQueryRequest) -> RAGQueryResponse:
     clean_query = sanitize_text(payload.query, max_length=1000)
     try:
-        results = rag_engine.query_collection(
+        results = get_rag_engine().query_collection(
             payload.collection_name,
             clean_query,
             n_results=payload.n_results,
@@ -774,8 +782,8 @@ async def analyze_resume(payload: ResumeAnalyzeRequest) -> ResumeAnalyzeResponse
     clean_text = sanitize_text(payload.text, max_length=settings.MAX_TEXT_INPUT_LENGTH)
     clean_role = sanitize_text(payload.target_role, max_length=160)
 
-    rag_engine.index_resume(clean_text, candidate_name="Candidate")
-    keywords, summary = engine.analyze_resume(clean_text, clean_role)
+    get_rag_engine().index_resume(clean_text, candidate_name="Candidate")
+    keywords, summary = get_interview_engine().analyze_resume(clean_text, clean_role)
     return ResumeAnalyzeResponse(keywords=keywords, summary=summary)
 
 
@@ -793,9 +801,9 @@ async def start_interview(
     payload.profile.resume_text = sanitize_text(payload.profile.resume_text, max_length=settings.MAX_TEXT_INPUT_LENGTH)
 
     if payload.profile.resume_text:
-        rag_engine.index_resume(payload.profile.resume_text, candidate_name=payload.profile.name)
+        get_rag_engine().index_resume(payload.profile.resume_text, candidate_name=payload.profile.name)
 
-    session_id, question, keywords = engine.start_session(payload.profile)
+    session_id, question, keywords = get_interview_engine().start_session(payload.profile)
 
     # If user is authenticated, link session to user account
     if current_user and current_user.get("user_id"):
@@ -841,7 +849,7 @@ async def evaluate_answer(
             skill_gap_report,
             roadmap,
             rag_context_summary,
-        ) = engine.evaluate_answer(
+        ) = get_interview_engine().evaluate_answer(
             payload.session_id,
             clean_question,
             clean_answer,
@@ -857,14 +865,14 @@ async def evaluate_answer(
         save_user_interview_evaluation(
             user_id=user_id,
             session_id=payload.session_id,
-            turn_index=len(engine.sessions.get(payload.session_id, {}).get("history", [])),
+            turn_index=len(get_interview_engine().sessions.get(payload.session_id, {}).get("history", [])),
             question=clean_question,
             answer=clean_answer,
             score=score,
             feedback_json=json.dumps(feedback),
         )
         # Update session score & completion
-        session_obj = engine.sessions.get(payload.session_id, {})
+        session_obj = get_interview_engine().sessions.get(payload.session_id, {})
         profile = session_obj.get("profile")
         role = profile.target_role if profile else "Software Engineer"
         dept = profile.department if profile else "Technical"
@@ -909,7 +917,7 @@ async def evaluate_answer(
 @app.websocket("/ws/interview/{session_id}")
 async def interview_socket(websocket: WebSocket, session_id: str) -> None:
     clean_session_id = sanitize_text(session_id, max_length=64)
-    if not clean_session_id or clean_session_id not in engine.sessions:
+    if not clean_session_id or clean_session_id not in get_interview_engine().sessions:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
