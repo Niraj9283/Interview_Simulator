@@ -26,6 +26,7 @@ class ResumeAnalyzeRequest(BaseModel):
 class ResumeAnalyzeResponse(BaseModel):
     keywords: list[str]
     summary: str
+    profile: dict = Field(default_factory=dict)
 
 
 class InterviewStartRequest(BaseModel):
@@ -36,6 +37,8 @@ class InterviewStartResponse(BaseModel):
     session_id: str
     question: str
     keywords: list[str]
+    question_plan: list[dict] = Field(default_factory=list)
+    resume_profile: dict = Field(default_factory=dict)
 
 
 class Signals(BaseModel):
@@ -192,6 +195,7 @@ class RAGResumeUploadResponse(BaseModel):
     extracted_skills: list[str]
     extracted_text: str
     summary: str
+    profile: dict = Field(default_factory=dict)
 
 
 class RAGStatusResponse(BaseModel):

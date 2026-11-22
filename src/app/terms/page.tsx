@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Scale, ArrowLeft, AlertCircle, ShieldAlert } from "lucide-react";
+import { ArrowLeft, AlertCircle, ShieldAlert } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -10,32 +10,29 @@ export const metadata: Metadata = {
 
 export default function TermsOfServicePage() {
   return (
-    <div className="mx-auto min-h-[85vh] max-w-4xl px-4 py-14 sm:px-6">
+    <div className="mx-auto min-h-[68vh] reading-page max-w-4xl px-4 py-14 sm:px-6">
       {/* Header */}
       <div className="mb-10 space-y-3">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-[#888888] hover:text-white transition mb-2"
+          className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition mb-2"
         >
           <ArrowLeft size={14} />
           <span>Back to Simulator</span>
         </Link>
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#FF4D3D]/30 bg-[#FF4D3D]/10 px-3 py-1 text-xs font-semibold text-[#FF4D3D]">
-          <Scale size={14} />
-          <span>Legal Agreement</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+
+        <h1 className="text-3xl sm:text-4xl font-semibold text-ink tracking-tight">
           Terms of Service
         </h1>
-        <p className="text-xs text-[#888888] font-mono">
+        <p className="text-xs text-muted font-mono">
           Last Updated: October 2026 &bull; Effective Immediately
         </p>
       </div>
 
-      <div className="space-y-8 text-xs sm:text-sm text-[#A0A0A0] leading-relaxed">
+      <div className="space-y-8 text-xs sm:text-sm text-muted leading-relaxed">
         {/* Section 1: Acceptance */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">1. Acceptance of Terms</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">1. Acceptance of Terms</h2>
           <p>
             By accessing or using <strong>MockMate AI</strong> (the &ldquo;Service&rdquo;), you agree to be bound
             by these Terms of Service. If you do not agree to all terms and conditions, you may not access
@@ -44,15 +41,15 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 2: Educational & Practice Tool Disclaimer */}
-        <section className="rounded-2xl border border-amber-500/20 bg-amber-950/10 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-amber-300 flex items-center gap-2">
+        <section className="rounded-xl border border-amber-500/20 bg-amber-50 p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-amber-800 flex items-center gap-2">
             <AlertCircle size={18} />
             <span>2. Educational Practice Tool Disclaimer — No Employment Guarantee</span>
           </h2>
-          <p className="text-neutral-200 font-medium">
+          <p className="text-ink font-medium">
             MockMate AI is an autonomous rehearsal and educational simulation platform:
           </p>
-          <ul className="list-disc pl-5 space-y-1.5 text-neutral-300">
+          <ul className="list-disc pl-5 space-y-1.5 text-ink">
             <li>
               <strong>No Guarantee of Employment:</strong> Use of MockMate AI does not guarantee an interview offer,
               job placement, compensation increase, or employment with any company.
@@ -67,8 +64,8 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 3: Account Responsibilities */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">3. Account Responsibilities & Security</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">3. Account Responsibilities & Security</h2>
           <p>
             You are responsible for maintaining the confidentiality of your credentials. You agree to notify us
             immediately of any unauthorized use of your account. You may not share your account or transfer it
@@ -77,9 +74,9 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 4: Prohibited Activity */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <ShieldAlert size={18} className="text-[#FF4D3D]" />
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+            <ShieldAlert size={18} className="text-moss" />
             <span>4. Prohibited Conduct</span>
           </h2>
           <p>You agree not to engage in any of the following prohibited activities:</p>
@@ -93,8 +90,8 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 5: Intellectual Property */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">5. User Content & Intellectual Property</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">5. User Content & Intellectual Property</h2>
           <p>
             <strong>Your Content:</strong> You retain ownership of all resume documents, code snippets, and interview
             answers you provide. You grant MockMate AI a non-exclusive license solely to process and analyze this
@@ -108,8 +105,8 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 6: Limitation of Liability */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">6. Limitation of Liability</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">6. Limitation of Liability</h2>
           <p>
             To the maximum extent permitted by applicable law, in no event shall MockMate AI, its developers, or its
             affiliates be liable for any indirect, incidental, special, consequential, or punitive damages, including
@@ -119,8 +116,8 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 7: Termination */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">7. Account Termination</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">7. Account Termination</h2>
           <p>
             You may terminate your account at any time via <strong>Settings &gt; Security Settings &gt; Delete Account</strong>.
             We reserve the right to suspend or terminate accounts that violate these Terms of Service or pose a
@@ -129,12 +126,12 @@ export default function TermsOfServicePage() {
         </section>
 
         {/* Section 8: Contact */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">8. Inquiries & Contact</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">8. Inquiries & Contact</h2>
           <p>For questions regarding these Terms of Service, please contact:</p>
-          <div className="rounded-xl border border-[#222222] bg-[#161616] p-4 text-xs font-mono text-[#D4D4D4] space-y-1">
+          <div className="rounded-xl border border-line bg-white p-4 text-xs font-mono text-ink space-y-1">
             <p><strong>MockMate AI Legal Operations</strong></p>
-            <p>Email: <a href="mailto:legal@mockmate.ai" className="text-[#FF4D3D] hover:underline">legal@mockmate.ai</a></p>
+            <p>Email: <a href="mailto:legal@mockmate.ai" className="text-moss hover:underline">legal@mockmate.ai</a></p>
           </div>
         </section>
       </div>

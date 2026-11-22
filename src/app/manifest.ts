@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Autonomous real-time AI interview simulator with speech analytics, eye contact tracking, and coding sandbox.",
     start_url: "/",
     display: "standalone",
-    background_color: "#080808",
-    theme_color: "#080808",
+    background_color: "#f7f8f3",
+    theme_color: "#f7f8f3",
     icons: [
       {
         src: "/icon.svg",

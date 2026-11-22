@@ -20,7 +20,7 @@ export function PasswordVisibilityToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 transition cursor-pointer ${className}`}
+      className={`rounded-lg p-2 text-muted hover:text-moss transition cursor-pointer ${className}`}
       aria-label={ariaLabel || (isVisible ? "Hide password" : "Show password")}
       title={ariaLabel || (isVisible ? "Hide password" : "Show password")}
     >

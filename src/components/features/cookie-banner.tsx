@@ -1,5 +1,7 @@
 "use client";
 
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
+
 import React, { useEffect, useState } from "react";
 import { Cookie, ShieldCheck, X, Check, Sliders, Database, Activity, Sparkles } from "lucide-react";
 import { trackConversion } from "@/lib/conversion-tracking";
@@ -70,6 +72,8 @@ export function CookieBanner() {
     return () => window.removeEventListener("mockmate:open-cookie-preferences", handleOpen);
   }, []);
 
+  const dialogRef = useDialogFocus(showPreferencesModal);
+
   const saveConsent = (prefs: CookiePreferences) => {
     const finalPrefs = { ...prefs, essential: true };
     try {
@@ -122,56 +126,17 @@ export function CookieBanner() {
         <div
           role="region"
           aria-label="Cookie consent banner"
-          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-4xl animate-in fade-in slide-in-from-bottom-5 duration-300 print:hidden"
+          className="consent-bar print:hidden"
         >
-          <div className="relative overflow-hidden rounded-2xl border border-[#2A2A2A] bg-[#111111]/98 p-5 text-white shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_25px_rgba(255,77,61,0.12)] backdrop-blur-2xl">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3.5">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-[#2A2A2A] bg-[#161616] text-[#FF4D3D] shadow-inner">
-                  <Cookie size={20} />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">
-                      Privacy First & Local Edge Processing
-                    </h2>
-                    <span className="rounded bg-[#FF4D3D]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#FF4D3D] border border-[#FF4D3D]/30">
-                      GDPR & CCPA Compliant
-                    </span>
-                  </div>
-                  <p className="text-xs leading-relaxed text-[#A0A0A0]">
-                    MockMate AI processes your camera & audio metrics locally on your device. We use
-                    privacy-focused cookies to store session states and edge AI model weights.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 sm:shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowPreferencesModal(true)}
-                  className="rounded-xl border border-[#2A2A2A] bg-[#151515] px-3.5 py-2 text-xs font-semibold text-neutral-300 transition hover:border-[#FF4D3D]/40 hover:text-white cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Sliders size={13} />
-                    Preferences
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeclineNonEssential}
-                  className="rounded-xl border border-[#2A2A2A] bg-[#181818] px-3.5 py-2 text-xs font-semibold text-neutral-300 transition hover:border-neutral-500 hover:text-white cursor-pointer"
-                >
-                  Essential Only
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAcceptAll}
-                  className="rounded-xl bg-[#FF4D3D] px-4 py-2 text-xs font-bold text-neutral-950 shadow-md shadow-[#FF4D3D]/30 transition hover:bg-[#ff3826] active:scale-95 cursor-pointer"
-                >
-                  Accept All
-                </button>
-              </div>
+          <div className="consent-inner">
+            <div className="consent-description">
+              <Cookie size={20} aria-hidden="true" />
+              <p><strong>Cookie preferences</strong><span>Choose which optional storage and analytics to allow.</span></p>
+            </div>
+            <div className="consent-actions">
+              <button type="button" onClick={() => setShowPreferencesModal(true)}>Customize</button>
+              <button type="button" onClick={handleDeclineNonEssential}>Essential only</button>
+              <button type="button" className="consent-accept" onClick={handleAcceptAll}>Accept all</button>
             </div>
           </div>
         </div>
@@ -180,15 +145,17 @@ export function CookieBanner() {
       {/* Comprehensive Cookie Preferences Modal */}
       {showPreferencesModal && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="cookie-preferences-title"
+          onKeyDown={(event) => { if (event.key === "Escape") setShowPreferencesModal(false); }}
           className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
         >
-          <div className="relative w-full max-w-xl rounded-2xl border border-[#2A2A2A] bg-[#111111] p-6 text-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#222222] pb-4 mb-4">
+          <div className="relative max-h-[90dvh] overflow-y-auto w-full max-w-xl rounded-2xl border border-divider bg-instrument p-6 text-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-divider pb-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="grid size-9 place-items-center rounded-xl bg-[#FF4D3D]/10 text-[#FF4D3D] border border-[#FF4D3D]/25">
+                <div className="grid size-9 place-items-center rounded-xl bg-signal/10 text-signal border border-signal/25">
                   <Sliders size={18} />
                 </div>
                 <div>
@@ -202,6 +169,7 @@ export function CookieBanner() {
               </div>
               <button
                 type="button"
+                aria-label="Close cookie preferences"
                 onClick={() => setShowPreferencesModal(false)}
                 className="rounded-lg p-1.5 text-[#888888] hover:bg-white/5 hover:text-white transition"
               >
@@ -212,7 +180,7 @@ export function CookieBanner() {
             {/* Categories */}
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               {/* Essential */}
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-[#222222] bg-[#161616] p-3.5">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-divider bg-console p-3.5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-emerald-400" />
@@ -227,17 +195,18 @@ export function CookieBanner() {
                 </div>
                 <input
                   type="checkbox"
+                  aria-label="Essential storage"
                   checked={true}
                   disabled
-                  className="mt-1 size-4 rounded accent-[#FF4D3D] opacity-60 cursor-not-allowed"
+                  className="mt-1 size-4 rounded accent-signal opacity-60 cursor-not-allowed"
                 />
               </div>
 
               {/* Edge Model Cache */}
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-[#222222] bg-[#161616] p-3.5">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-divider bg-console p-3.5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Database size={16} className="text-[#FF4D3D]" />
+                    <Database size={16} className="text-signal" />
                     <span className="text-xs font-bold text-white">Edge Model Cache</span>
                   </div>
                   <p className="text-xs leading-relaxed text-[#A0A0A0]">
@@ -246,16 +215,17 @@ export function CookieBanner() {
                 </div>
                 <input
                   type="checkbox"
+                  aria-label="Edge model cache"
                   checked={preferences.modelCache}
                   onChange={(e) =>
                     setPreferences({ ...preferences, modelCache: e.target.checked })
                   }
-                  className="mt-1 size-4 rounded accent-[#FF4D3D] cursor-pointer"
+                  className="mt-1 size-4 rounded accent-signal cursor-pointer"
                 />
               </div>
 
               {/* Anonymous Telemetry */}
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-[#222222] bg-[#161616] p-3.5">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-divider bg-console p-3.5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Activity size={16} className="text-sky-400" />
@@ -267,16 +237,17 @@ export function CookieBanner() {
                 </div>
                 <input
                   type="checkbox"
+                  aria-label="Anonymous telemetry"
                   checked={preferences.analytics}
                   onChange={(e) =>
                     setPreferences({ ...preferences, analytics: e.target.checked })
                   }
-                  className="mt-1 size-4 rounded accent-[#FF4D3D] cursor-pointer"
+                  className="mt-1 size-4 rounded accent-signal cursor-pointer"
                 />
               </div>
 
               {/* Personalization */}
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-[#222222] bg-[#161616] p-3.5">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-divider bg-console p-3.5">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-amber-400" />
@@ -288,17 +259,18 @@ export function CookieBanner() {
                 </div>
                 <input
                   type="checkbox"
+                  aria-label="Interface personalization"
                   checked={preferences.personalization}
                   onChange={(e) =>
                     setPreferences({ ...preferences, personalization: e.target.checked })
                   }
-                  className="mt-1 size-4 rounded accent-[#FF4D3D] cursor-pointer"
+                  className="mt-1 size-4 rounded accent-signal cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Actions */}
-            <div className="mt-5 flex items-center justify-between border-t border-[#222222] pt-4">
+            <div className="mt-5 flex items-center justify-between border-t border-divider pt-4">
               <button
                 type="button"
                 onClick={handleDeclineNonEssential}
@@ -310,14 +282,14 @@ export function CookieBanner() {
                 <button
                   type="button"
                   onClick={handleAcceptAll}
-                  className="rounded-xl border border-[#2A2A2A] bg-[#181818] px-3.5 py-2 text-xs font-semibold text-neutral-300 hover:text-white transition cursor-pointer"
+                  className="rounded-xl border border-divider bg-console px-3.5 py-2 text-xs font-semibold text-neutral-300 hover:text-white transition cursor-pointer"
                 >
                   Accept All
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveCustom}
-                  className="flex items-center gap-1.5 rounded-xl bg-[#FF4D3D] px-4 py-2 text-xs font-bold text-neutral-950 shadow-md shadow-[#FF4D3D]/25 hover:bg-[#ff3826] transition cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-xl bg-signal px-4 py-2 text-xs font-bold text-neutral-950 shadow-md  hover:bg-signal transition cursor-pointer"
                 >
                   <Check size={14} />
                   Save Choices

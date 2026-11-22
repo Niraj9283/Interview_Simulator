@@ -53,9 +53,9 @@ export function Breadcrumbs({ items, className = "" }: BreadcrumbsProps) {
           <li className="flex items-center">
             <Link
               href="/"
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[#A0A0A0] transition hover:bg-white/5 hover:text-white"
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition hover:bg-white/5 hover:text-ink"
             >
-              <Home size={13} className="text-[#FF4D3D]" />
+              <Home size={13} className="text-moss" />
               <span className="sr-only">Home</span>
             </Link>
           </li>
@@ -68,14 +68,14 @@ export function Breadcrumbs({ items, className = "" }: BreadcrumbsProps) {
                 {isLast || !item.href ? (
                   <span
                     aria-current="page"
-                    className="rounded px-1.5 py-0.5 font-medium text-[#F5F5F5]"
+                    className="rounded px-1.5 py-0.5 font-medium text-ink"
                   >
                     {item.name}
                   </span>
                 ) : (
                   <Link
                     href={item.href}
-                    className="rounded px-1.5 py-0.5 text-[#A0A0A0] transition hover:bg-white/5 hover:text-white"
+                    className="rounded px-1.5 py-0.5 text-muted transition hover:bg-white/5 hover:text-ink"
                   >
                     {item.name}
                   </Link>

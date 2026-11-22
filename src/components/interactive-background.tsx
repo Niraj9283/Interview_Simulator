@@ -12,7 +12,6 @@ type Particle = {
   originY: number;
   radius: number;
   phase: number;
-  isAccent: boolean;
 };
 
 type Pointer = {
@@ -56,13 +55,12 @@ function usePrefersReducedMotion() {
 }
 
 function buildParticles(width: number, height: number): Particle[] {
-  const random = createRandom(20261016);
-  const count = Math.round(Math.min(45, Math.max(24, (width * height) / 32000)));
+  const random = createRandom(20261122);
+  const count = Math.round(Math.min(36, Math.max(16, (width * height) / 45000)));
 
   return Array.from({ length: count }, (_, index): Particle => {
     const x = random() * width;
     const y = random() * height;
-    const isAccent = index % 3 === 0;
 
     return {
       id: index,
@@ -70,11 +68,10 @@ function buildParticles(width: number, height: number): Particle[] {
       y,
       originX: x,
       originY: y,
-      vx: (random() - 0.5) * 0.28,
-      vy: (random() - 0.5) * 0.28,
-      radius: isAccent ? 1.4 : 1.1,
+      vx: (random() - 0.5) * 0.18,
+      vy: (random() - 0.5) * 0.18,
+      radius: 1.0,
       phase: random() * Math.PI * 2,
-      isAccent,
     };
   });
 }
@@ -133,7 +130,7 @@ export default function InteractiveBackground() {
     }
 
     function wrapParticle(particle: Particle) {
-      const margin = 80;
+      const margin = 60;
       if (particle.x < -margin) particle.x = state.width + margin;
       if (particle.x > state.width + margin) particle.x = -margin;
       if (particle.y < -margin) particle.y = state.height + margin;
@@ -141,40 +138,11 @@ export default function InteractiveBackground() {
     }
 
     function paintBackground(targetCtx: CanvasRenderingContext2D, width: number, height: number) {
-      // Near-black base (#080808)
-      targetCtx.fillStyle = "#080808";
+      targetCtx.fillStyle = "#09090b";
       targetCtx.fillRect(0, 0, width, height);
 
-      // Subtle ambient red-orange glow #FF4D3D
-      const glowA = targetCtx.createRadialGradient(
-        width * 0.2,
-        height * 0.25,
-        0,
-        width * 0.2,
-        height * 0.25,
-        width * 0.55
-      );
-      glowA.addColorStop(0, "rgba(255, 77, 61, 0.07)");
-      glowA.addColorStop(1, "rgba(255, 77, 61, 0)");
-      targetCtx.fillStyle = glowA;
-      targetCtx.fillRect(0, 0, width, height);
-
-      // Deep secondary subtle glow #D9362B
-      const glowB = targetCtx.createRadialGradient(
-        width * 0.82,
-        height * 0.75,
-        0,
-        width * 0.82,
-        height * 0.75,
-        width * 0.5
-      );
-      glowB.addColorStop(0, "rgba(217, 54, 43, 0.05)");
-      glowB.addColorStop(1, "rgba(217, 54, 43, 0)");
-      targetCtx.fillStyle = glowB;
-      targetCtx.fillRect(0, 0, width, height);
-
-      // Fine geometric technical grid lines
-      targetCtx.strokeStyle = "rgba(255, 255, 255, 0.02)";
+      // Fine, subtle geometric architectural grid
+      targetCtx.strokeStyle = "rgba(255, 255, 255, 0.015)";
       targetCtx.lineWidth = 1;
       const gridSize = 64;
 
@@ -216,113 +184,100 @@ export default function InteractiveBackground() {
     }
 
     function updateParticles() {
-      const speed = reducedMotionRef.current ? 0.2 : 0.85;
-      const pointerStrength = pointer.active ? 0.012 : 0;
+      const speed = reducedMotionRef.current ? 0.1 : 0.6;
+      const pointerStrength = pointer.active ? 0.008 : 0;
 
       for (const particle of particlesRef.current) {
-        particle.x += particle.vx * speed + Math.sin(state.time * 0.005 + particle.phase) * 0.04;
-        particle.y += particle.vy * speed + Math.cos(state.time * 0.004 + particle.phase) * 0.03;
+        particle.x += particle.vx * speed + Math.sin(state.time * 0.004 + particle.phase) * 0.02;
+        particle.y += particle.vy * speed + Math.cos(state.time * 0.003 + particle.phase) * 0.02;
 
         if (pointer.active) {
           const dx = pointer.x - particle.x;
           const dy = pointer.y - particle.y;
           const distanceSquared = dx * dx + dy * dy;
 
-          if (distanceSquared < 45000) {
-            const force = (1 - distanceSquared / 45000) * pointerStrength;
-            particle.x -= dx * force;
-            particle.y -= dy * force;
+            if (distanceSquared < 35000) {
+              const force = (1 - distanceSquared / 35000) * pointerStrength;
+              particle.x -= dx * force;
+              particle.y -= dy * force;
+            }
+          }
+
+          wrapParticle(particle);
+        }
+      }
+
+      function paintMesh() {
+        const particles = particlesRef.current;
+        const maxDistance = Math.min(140, Math.max(90, state.width / 10));
+        const maxDistanceSquared = maxDistance * maxDistance;
+
+        ctx.lineWidth = 0.75;
+        ctx.shadowBlur = 0;
+
+        for (let i = 0; i < particles.length; i++) {
+          const particle = particles[i];
+
+          for (let j = i + 1; j < particles.length; j++) {
+            const other = particles[j];
+            const dx = particle.x - other.x;
+            const dy = particle.y - other.y;
+            const distanceSquared = dx * dx + dy * dy;
+
+            if (distanceSquared > maxDistanceSquared) continue;
+
+            const ratio = 1 - Math.sqrt(distanceSquared) / maxDistance;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${ratio * 0.04})`;
+
+            ctx.beginPath();
+            ctx.moveTo(particle.x, particle.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
           }
         }
 
-        wrapParticle(particle);
-      }
-    }
-
-    function paintMesh() {
-      const particles = particlesRef.current;
-      const maxDistance = Math.min(160, Math.max(110, state.width / 9));
-      const maxDistanceSquared = maxDistance * maxDistance;
-
-      ctx.lineWidth = 1;
-      ctx.shadowBlur = 0;
-
-      for (let i = 0; i < particles.length; i++) {
-        const particle = particles[i];
-
-        for (let j = i + 1; j < particles.length; j++) {
-          const other = particles[j];
-          const dx = particle.x - other.x;
-          const dy = particle.y - other.y;
-          const distanceSquared = dx * dx + dy * dy;
-
-          if (distanceSquared > maxDistanceSquared) continue;
-
-          const ratio = 1 - Math.sqrt(distanceSquared) / maxDistance;
-          const hasAccent = particle.isAccent || other.isAccent;
-
-          if (hasAccent) {
-            ctx.strokeStyle = `rgba(255, 77, 61, ${ratio * 0.25})`;
-          } else {
-            ctx.strokeStyle = `rgba(255, 255, 255, ${ratio * 0.08})`;
-          }
-
+        // Micro dots
+        for (const particle of particles) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
           ctx.beginPath();
-          ctx.moveTo(particle.x, particle.y);
-          ctx.lineTo(other.x, other.y);
-          ctx.stroke();
+          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
-      // Render technical geometric particle nodes
-      for (const particle of particles) {
-        const pulse = 0.8 + Math.sin(state.time * 0.03 + particle.phase) * 0.2;
+      function paint() {
+        state.time += 1;
+        const background = backgroundRef.current;
 
-        if (particle.isAccent) {
-          ctx.fillStyle = `rgba(255, 77, 61, ${0.45 + pulse * 0.25})`;
+        if (background) {
+          ctx.drawImage(background.canvas, 0, 0, background.width, background.height);
         } else {
-          ctx.fillStyle = `rgba(200, 200, 200, ${0.25 + pulse * 0.15})`;
+          paintBackground(ctx, state.width, state.height);
         }
 
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius * pulse, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    function paint() {
-      state.time += 1;
-      const background = backgroundRef.current;
-
-      if (background) {
-        ctx.drawImage(background.canvas, 0, 0, background.width, background.height);
-      } else {
-        paintBackground(ctx, state.width, state.height);
+        updateParticles();
+        paintMesh();
+        frameRef.current = window.requestAnimationFrame(paint);
       }
 
-      updateParticles();
-      paintMesh();
-      frameRef.current = window.requestAnimationFrame(paint);
-    }
+      resize();
+      paint();
 
-    resize();
-    paint();
+      window.addEventListener("resize", resize);
+      window.addEventListener("mousemove", handleMouseMove, { passive: true });
+      window.addEventListener("mouseleave", handleMouseLeave);
+      window.addEventListener("touchmove", handleTouchMove, { passive: true });
 
-    window.addEventListener("resize", resize);
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    window.addEventListener("mouseleave", handleMouseLeave);
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
-
-    return () => {
-      if (frameRef.current) {
-        window.cancelAnimationFrame(frameRef.current);
-      }
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseleave", handleMouseLeave);
-      window.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, [reducedMotionRef]);
+      return () => {
+        if (frameRef.current) {
+          window.cancelAnimationFrame(frameRef.current);
+        }
+        window.removeEventListener("resize", resize);
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseleave", handleMouseLeave);
+        window.removeEventListener("touchmove", handleTouchMove);
+      };
+    }, [reducedMotionRef]);
 
   return <canvas ref={canvasRef} aria-hidden="true" className="interactive-bg" />;
 }

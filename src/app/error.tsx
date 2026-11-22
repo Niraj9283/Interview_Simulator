@@ -22,23 +22,22 @@ export default function ErrorBoundary({
   }, [error]);
 
   return (
-    <div className="flex min-h-[85vh] items-center justify-center px-4 py-12 sm:px-6">
-      <div className="w-full max-w-lg rounded-2xl border border-[#2A2A2A] bg-[#121212]/95 p-8 text-center backdrop-blur-xl shadow-2xl space-y-6">
-        <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#FF4D3D]/10 border border-[#FF4D3D]/30 text-[#FF4D3D] shadow-lg shadow-[#FF4D3D]/20">
+    <div className="flex min-h-[68vh] items-center justify-center px-4 py-12 sm:px-6">
+      <div className="w-full max-w-lg rounded-xl border border-line bg-white p-8 text-center shadow-sm space-y-6">
+        <div className="mx-auto grid size-16 place-items-center rounded-xl bg-moss/10 border border-moss/30 text-moss shadow-lg ">
           <BrainCircuit size={32} />
         </div>
 
         <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-950/20 px-3 py-1 text-xs font-semibold text-red-400 mb-3">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 mb-3">
             <AlertCircle size={13} />
-            <span>Application State Exception</span>
+            <span>Application error</span>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Unexpected Simulation Error
+          <h1 className="text-2xl font-semibold text-ink tracking-tight">
+            The simulator could not load
           </h1>
-          <p className="mt-2 text-xs sm:text-sm text-[#A0A0A0] leading-relaxed">
-            The interview simulator encountered an unhandled condition while processing
-            telemetry or rendering audio components. No data has been lost.
+          <p className="mt-2 text-xs sm:text-sm text-muted leading-relaxed">
+            Try loading the simulator again or return to the home page.
           </p>
           {error.digest && (
             <p className="mt-3 text-[11px] font-mono text-[#666666]">
@@ -51,14 +50,14 @@ export default function ErrorBoundary({
           <button
             type="button"
             onClick={() => reset()}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#FF4D3D] px-6 py-2.5 text-xs font-bold text-neutral-950 shadow-md shadow-[#FF4D3D]/25 hover:bg-[#ff3826] transition cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-moss px-6 py-2.5 text-xs font-semibold text-white shadow-md  hover:bg-moss transition cursor-pointer"
           >
             <RotateCcw size={14} />
             <span>Try Again</span>
           </button>
           <Link
             href="/"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#161616] px-6 py-2.5 text-xs font-bold text-white hover:bg-[#202020] transition"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-6 py-2.5 text-xs font-semibold text-ink hover:bg-paper transition"
           >
             <Home size={14} />
             <span>Return to Simulator</span>

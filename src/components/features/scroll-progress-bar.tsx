@@ -31,13 +31,13 @@ export function ScrollProgressBar() {
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 h-1 bg-black/20 pointer-events-none print:hidden"
+      className="fixed top-0 left-0 right-0 z-50 h-0.5 pointer-events-none print:hidden"
       role="progressbar"
       aria-label="Page reading and scroll progress"
     >
       <div
         ref={barRef}
-        className="h-full bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] shadow-[0_0_10px_rgba(255,77,61,0.8)] will-change-[width]"
+        className="h-full bg-moss will-change-[width]"
         style={{ width: "0%" }}
       />
     </div>

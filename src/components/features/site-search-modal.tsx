@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Search,
@@ -46,10 +48,13 @@ export function SiteSearchModal({
   onOpenIntegrity,
   onOpenBenchmark,
 }: SiteSearchModalProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  const dialogRef = useDialogFocus(isOpen);
 
   // Search items catalog
   const items: SearchItem[] = useMemo(() => [
@@ -57,11 +62,12 @@ export function SiteSearchModal({
       id: "track-ml",
       title: "Machine Learning & AI Track",
       category: "Track",
-      description: "Neural architectures, fine-tuning, RAG, and ML deployment questions.",
+      description: "Set up a technical profile for machine learning interview questions.",
       icon: BrainCircuit,
       keywords: ["machine learning", "python", "pytorch", "rag", "ai", "deep learning"],
       action: () => {
-        onSelectTrack?.("Machine Learning Engineer");
+        if (onSelectTrack) onSelectTrack("Machine Learning Engineer");
+        else router.push("/onboarding");
         onClose();
       },
     },
@@ -73,7 +79,8 @@ export function SiteSearchModal({
       icon: Code2,
       keywords: ["coding", "leetcode", "dsa", "algorithms", "array", "graph", "dynamic programming"],
       action: () => {
-        onSelectTrack?.("Full Stack Developer");
+        if (onSelectTrack) onSelectTrack("Full Stack Developer");
+        else window.dispatchEvent(new CustomEvent("mockmate:open-module", { detail: { moduleId: "coding-sandbox" } }));
         onClose();
       },
     },
@@ -85,197 +92,213 @@ export function SiteSearchModal({
       icon: Monitor,
       keywords: ["system design", "scalability", "architecture", "microservices", "redis", "kafka"],
       action: () => {
-        onSelectTrack?.("Cloud Architect");
+        if (onSelectTrack) onSelectTrack("Cloud Architect");
+        else window.dispatchEvent(new CustomEvent("mockmate:open-module", { detail: { moduleId: "system-design-canvas" } }));
         onClose();
       },
     },
     {
       id: "track-behavioral",
-      title: "Behavioral & Leadership",
+      title: "Behavioral STAR Assessment",
       category: "Track",
-      description: "STAR method scenarios, conflict resolution, and cross-functional leadership.",
+      description: "Evaluation against Situation, Task, Action, Result framework.",
       icon: Users,
-      keywords: ["behavioral", "hr", "star method", "leadership", "culture fit"],
+      keywords: ["behavioral", "star", "leadership", "management", "hr", "conflict"],
       action: () => {
-        onSelectTrack?.("Product Manager");
+        if (onSelectTrack) onSelectTrack("Engineering Manager");
+        else window.dispatchEvent(new CustomEvent("mockmate:open-module", { detail: { moduleId: "behavioral-star-rubric" } }));
         onClose();
       },
     },
     {
-      id: "feature-integrity",
-      title: "Anti-Cheating & Integrity Shield",
+      id: "feat-speech",
+      title: "Speech & Cadence Forensics",
       category: "Feature",
-      description: "View multimodal gaze tracking, tab-switching deterrence, and face telemetry.",
-      icon: ShieldCheck,
-      keywords: ["anti-cheat", "integrity", "eye contact", "gaze", "telemetry"],
+      description: "Local Web Audio analysis for WPM, pause patterns, steadiness, and filler words.",
+      icon: Activity,
+      keywords: ["voice", "speech", "cadence", "wpm", "filler words", "audio", "pace"],
       action: () => {
-        onOpenIntegrity?.();
+        window.dispatchEvent(new CustomEvent("mockmate:open-module", { detail: { moduleId: "speech-cadence-analytics" } }));
         onClose();
       },
     },
     {
-      id: "feature-edge",
-      title: "Edge AI Architecture & Topology",
+      id: "feat-edge",
+      title: "Edge AI Architecture & Zero Biometrics",
       category: "Feature",
-      description: "Inspect local WebAssembly models, offline inference latency, and air-gapped setup.",
+      description: "Explore on-device WebAssembly execution and zero remote video storage.",
       icon: Cpu,
-      keywords: ["edge", "offline", "wasm", "privacy", "latency", "local model"],
+      keywords: ["edge", "privacy", "onnx", "wasm", "client-side", "biometrics", "architecture"],
       action: () => {
-        onOpenEdgeTopology?.();
+        if (onOpenEdgeTopology) onOpenEdgeTopology();
         onClose();
       },
     },
     {
-      id: "feature-benchmark",
-      title: "Longitudinal Benchmark Engine",
+      id: "feat-integrity",
+      title: "Gaze & Integrity Shield",
       category: "Feature",
-      description: "Compare your performance against peer cohorts in tech, finance, and product.",
+      description: "Real-time MediaPipe eye contact and anti-cheat tracking telemetry.",
+      icon: ShieldCheck,
+      keywords: ["integrity", "gaze", "eye contact", "camera", "proctoring", "anti-cheating"],
+      action: () => {
+        if (onOpenIntegrity) onOpenIntegrity();
+        onClose();
+      },
+    },
+    {
+      id: "feat-benchmark",
+      title: "Peer Percentile Benchmarking",
+      category: "Feature",
+      description: "Compare communication, technical, and behavioral performance to peer candidates.",
       icon: TrendingUp,
-      keywords: ["benchmark", "percentile", "score", "analytics", "ranking"],
+      keywords: ["benchmark", "percentile", "score", "growth", "progression", "cohort"],
       action: () => {
-        onOpenBenchmark?.();
+        if (onOpenBenchmark) onOpenBenchmark();
         onClose();
       },
     },
     {
-      id: "faq-speech",
-      title: "FAQ: How does voice & speech pace analysis work?",
-      category: "FAQ",
-      description: "Details on live WPM tracking, filler word detection, and vocal steadiness.",
-      icon: HelpCircle,
-      keywords: ["speech", "voice", "audio", "wpm", "fillers", "microphone"],
-      action: () => {
-        const el = document.getElementById("faq-section");
-        el?.scrollIntoView({ behavior: "smooth" });
-        onClose();
-      },
-    },
-    {
-      id: "action-scroll-top",
-      title: "Scroll to Top",
+      id: "action-onboarding",
+      title: "Setup & Onboarding Wizard",
       category: "Action",
-      description: "Quickly return to the top of the interview simulator.",
-      icon: ArrowRight,
-      keywords: ["top", "scroll", "home"],
+      description: "Configure candidate name, target role, department, and default resume.",
+      icon: BookOpen,
+      keywords: ["setup", "onboarding", "wizard", "profile", "preferences", "guide"],
       action: () => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        router.push("/onboarding");
         onClose();
       },
     },
-  ], [onSelectTrack, onOpenEdgeTopology, onOpenIntegrity, onOpenBenchmark, onClose]);
+  {
+    id: "faq-privacy",
+      title: "FAQ: Is my camera video uploaded?",
+        category: "FAQ",
+          description: "Learn how local MediaPipe processing guarantees zero video storage.",
+            icon: HelpCircle,
+              keywords: ["faq", "privacy", "video", "upload", "security", "gdpr"],
+                action: () => {
+                  window.dispatchEvent(new CustomEvent("mockmate:open-faq"));
+                  onClose();
+                },
+    },
+  ], [onSelectTrack, onOpenEdgeTopology, onOpenIntegrity, onOpenBenchmark, router, onClose]);
 
-  // Filtered items
+  // Filter items
   const filtered = useMemo(() => {
     if (!query.trim()) return items;
-    const lower = query.toLowerCase().trim();
+    const q = query.toLowerCase();
     return items.filter(
       (item) =>
-        item.title.toLowerCase().includes(lower) ||
-        item.description.toLowerCase().includes(lower) ||
-        item.category.toLowerCase().includes(lower) ||
-        item.keywords?.some((k) => k.toLowerCase().includes(lower))
+        item.title.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q) ||
+      item.keywords?.some((k) => k.toLowerCase().includes(q))
     );
-  }, [items, query]);
+}, [items, query]);
 
-  // Focus input on open
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(timer);
+// Focus input on open
+useEffect(() => {
+  if (isOpen) {
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }
+}, [isOpen]);
+
+const handleClose = () => {
+  setQuery("");
+  setSelectedIndex(0);
+  onClose();
+};
+
+const activeIndex = selectedIndex >= filtered.length ? 0 : selectedIndex;
+
+// Keyboard navigation
+useEffect(() => {
+  if (!isOpen) return;
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      handleClose();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1 < filtered.length ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filtered.length - 1));
+    } else if (e.key === "Enter" && document.activeElement === inputRef.current) {
+      e.preventDefault();
+      if (filtered[activeIndex]) {
+        filtered[activeIndex].action();
+        handleClose();
+      }
     }
-  }, [isOpen]);
-
-  const handleClose = () => {
-    setQuery("");
-    setSelectedIndex(0);
-    onClose();
   };
 
-  const activeIndex = selectedIndex >= filtered.length ? 0 : selectedIndex;
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, [isOpen, filtered, activeIndex]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    if (!isOpen) return;
+if (!isOpen) return null;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        handleClose();
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1 < filtered.length ? prev + 1 : 0));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filtered.length - 1));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (filtered[activeIndex]) {
-          filtered[activeIndex].action();
-          handleClose();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, filtered, activeIndex]);
-
-  if (!isOpen) return null;
-
-  return (
+return (
+  <div
+    className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 print:hidden"
+    ref={dialogRef}
+    role="dialog"
+    aria-modal="true"
+    aria-label="Site Search and Command Palette"
+  >
+    {/* Backdrop */}
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 print:hidden"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Site Search and Command Palette"
-    >
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-md transition-opacity"
-        onClick={handleClose}
-      />
+      className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+      onClick={handleClose}
+    />
 
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[#2A2A2A] bg-[#111111]/98 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_30px_rgba(255,77,61,0.15)] backdrop-blur-2xl">
+    {/* Modal Dialog */}
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-0 shadow-2xl">
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 border-b border-[#222222] px-4 py-3.5">
-          <Search size={20} className="text-[#FF4D3D] shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-            placeholder="Search interview tracks, features, FAQs, or shortcuts... (↑↓ to navigate)"
-            className="w-full bg-transparent text-sm text-[#F5F5F5] placeholder:text-neutral-500 focus:outline-none"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
+          <div className="flex items-center gap-3 border-b border-zinc-850 px-4 py-3">
+            <Search size={16} className="text-zinc-400 shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
                 setSelectedIndex(0);
               }}
-              className="text-neutral-400 hover:text-white p-1"
-            >
-              <X size={16} />
-            </button>
-          )}
-          <kbd className="hidden sm:inline-block rounded border border-[#2A2A2A] bg-[#181818] px-1.5 py-0.5 text-[10px] font-mono text-neutral-400">
-            ESC
-          </kbd>
-        </div>
+              aria-label="Search the platform"
+              placeholder="Search tracks, capabilities, FAQs, or actions... (↑↓ to navigate)"
+              className="w-full bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setSelectedIndex(0);
+                }}
+                aria-label="Clear search"
+                className="text-zinc-400 hover:text-white p-1"
+              >
+                <X size={14} />
+              </button>
+            )}
+              <kbd className="hidden sm:inline-block rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+                ESC
+              </kbd>
+          </div>
 
-        {/* Results List */}
-        <div
-          ref={resultsRef}
-          className="max-h-[60vh] overflow-y-auto p-2"
-        >
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-sm text-neutral-400">
-              <Sparkles size={28} className="mx-auto mb-2 text-[#FF4D3D]/50" />
+          {/* Results List */}
+          <div
+            ref={resultsRef}
+            className="max-h-[55vh] overflow-y-auto p-2"
+          >
+            {filtered.length === 0 ? (
+            <div className="p-8 text-center text-xs text-zinc-400">
+              <Sparkles size={20} className="mx-auto mb-2 text-zinc-600" />
               No results found for &ldquo;{query}&rdquo;
             </div>
           ) : (
@@ -288,46 +311,46 @@ export function SiteSearchModal({
                   type="button"
                   onClick={item.action}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`flex w-full items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors cursor-pointer ${
                     isSelected
-                      ? "bg-[#FF4D3D]/10 border border-[#FF4D3D]/40 text-white"
-                      : "text-neutral-300 hover:bg-[#181818] border border-transparent"
+                      ? "bg-zinc-900 text-zinc-100 border border-zinc-800"
+                      : "text-zinc-300 hover:bg-zinc-900/50 border border-transparent"
                   }`}
                 >
                   <div
-                    className={`grid size-9 shrink-0 place-items-center rounded-lg transition-colors ${
+                    className={`grid size-7 shrink-0 place-items-center rounded border transition-colors ${
                       isSelected
-                        ? "bg-[#FF4D3D] text-black shadow-md shadow-[#FF4D3D]/40"
-                        : "bg-[#181818] border border-[#262626] text-neutral-400"
+                        ? "bg-zinc-100 border-zinc-100 text-zinc-950 font-semibold"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400"
                     }`}
                   >
-                    <Icon size={18} />
+                    <Icon size={14} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-xs font-semibold text-white">
+                      <span className="truncate text-xs font-medium text-zinc-200">
                         {item.title}
                       </span>
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-medium uppercase tracking-wider ${
                           item.category === "Track"
-                            ? "bg-[#FF4D3D]/15 text-[#FF4D3D] border border-[#FF4D3D]/20"
+                            ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                             : item.category === "Feature"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : item.category === "FAQ"
-                            ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                            : "bg-blue-500/15 text-blue-400 border border-blue-500/20"
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-zinc-800 text-zinc-300 border border-zinc-700"
                         }`}
                       >
                         {item.category}
                       </span>
                     </div>
-                    <p className="truncate text-[11px] text-neutral-400">{item.description}</p>
+                    <p className="truncate text-[11px] text-zinc-500">{item.description}</p>
                   </div>
                   <ArrowRight
-                    size={14}
+                    size={13}
                     className={`shrink-0 transition-transform ${
-                      isSelected ? "translate-x-1 text-[#FF4D3D]" : "text-transparent"
+                      isSelected ? "translate-x-0.5 text-zinc-200" : "text-transparent"
                     }`}
                   />
                 </button>
@@ -337,21 +360,21 @@ export function SiteSearchModal({
         </div>
 
         {/* Footer shortcuts */}
-        <div className="flex items-center justify-between border-t border-[#222222] bg-[#0c0c0c] px-4 py-2.5 text-[11px] text-neutral-400">
+        <div className="flex items-center justify-between border-t border-zinc-850 bg-zinc-950 px-4 py-2.5 text-[11px] text-zinc-500">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-[#262626] bg-[#181818] px-1 py-0.5 text-[10px] font-mono text-neutral-300">↑</kbd>
-              <kbd className="rounded border border-[#262626] bg-[#181818] px-1 py-0.5 text-[10px] font-mono text-neutral-300">↓</kbd>
+              <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1 py-0.2 text-[9px] font-mono text-zinc-400">↑</kbd>
+              <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1 py-0.2 text-[9px] font-mono text-zinc-400">↓</kbd>
               to navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-[#262626] bg-[#181818] px-1.5 py-0.5 text-[10px] font-mono text-neutral-300">↵</kbd>
-              to open
+              <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.2 text-[9px] font-mono text-zinc-400">↵</kbd>
+              to select
             </span>
           </div>
-          <span className="text-[10px] text-[#FF4D3D]/80 font-mono">MockMate Search v2.0</span>
+          <span className="text-[10px] text-zinc-500 font-mono">MockMate Search</span>
         </div>
       </div>
     </div>
-  );
+            );
 }

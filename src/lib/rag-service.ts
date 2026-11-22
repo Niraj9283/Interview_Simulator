@@ -33,6 +33,15 @@ export interface ResumeUploadResult {
   extracted_skills: string[];
   extracted_text: string;
   summary: string;
+  profile?: unknown;
+}
+
+export interface InterviewStartResult {
+  session_id: string;
+  question: string;
+  keywords: string[];
+  question_plan?: Array<{ question: string; category?: string }>;
+  resume_profile?: unknown;
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -89,12 +98,23 @@ export async function uploadResumeRAG(file: File | null, rawText?: string): Prom
     if (res.ok) {
       return await res.json();
     }
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.detail || "The resume could not be processed.");
   } catch (err) {
+    if (err instanceof Error && !/fetch|timeout|network/i.test(err.message)) {
+      throw err;
+    }
     console.warn("Backend RAG upload fallback:", err);
   }
 
   // Client-side fallback extraction
+  if (file?.name.toLowerCase().endsWith(".pdf")) {
+    throw new Error("PDF processing is temporarily unavailable. Reconnect to the interview service or upload a UTF-8 text resume.");
+  }
   const text = rawText || (file ? await file.text() : "");
+  if (!text.trim()) {
+    throw new Error("No readable text was found in this resume.");
+  }
   const extractedSkills = extractSkillsFromResume(text);
 
   return {
@@ -106,6 +126,37 @@ export async function uploadResumeRAG(file: File | null, rawText?: string): Prom
       ? `Primary signals: ${extractedSkills.slice(0, 5).join(", ")}.`
       : "Primary signals parsed from candidate resume.",
   };
+}
+
+export async function startPersonalizedInterview(profile: {
+  name: string;
+  department: string;
+  targetRole: string;
+  domain: string;
+  difficulty: string;
+  resumeText: string;
+}): Promise<InterviewStartResult | null> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/interview/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: {
+          name: profile.name,
+          department: profile.department,
+          target_role: profile.targetRole,
+          domain: profile.domain,
+          difficulty: profile.difficulty,
+          resume_text: profile.resumeText,
+        },
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function queryRAG(

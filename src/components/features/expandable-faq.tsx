@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, HelpCircle, Sparkles, Search } from "lucide-react";
+import { ChevronDown, HelpCircle, Search } from "lucide-react";
 import { FAQS, FAQItem } from "@/lib/faq-data";
 
 export { FAQS };
 export type { FAQItem };
-
 
 export function ExpandableFAQ() {
   const [openIds, setOpenIds] = useState<string[]>(["speech-analysis"]);
@@ -30,48 +29,49 @@ export function ExpandableFAQ() {
   });
 
   return (
-    <section id="faq-section" className="w-full space-y-6 pt-4 print:hidden">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="grid size-8 place-items-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
-              <HelpCircle size={18} />
-            </div>
-            <h2 className="text-xl font-bold tracking-tight text-white">
-              Frequently Asked Questions
-            </h2>
-          </div>
-          <p className="text-xs text-zinc-400">
-            Learn more about speech tracking, local edge models, and scoring mechanics.
-          </p>
-        </div>
+      <section id="faq-section" className="w-full space-y-6 pt-6 print:hidden">
+        {/* Header */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-800/80 pb-5">
+            <div className="space-y-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-8 place-items-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300">
+                      <HelpCircle size={16} />
+                    </div>
+                      <h2 className="text-lg font-semibold tracking-tight text-zinc-100">
+                        Frequently Asked Questions
+                      </h2>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Answers regarding real-time vocal cadence, on-device Edge RAG, and multi-axis scoring.
+                  </p>
+                </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search questions..."
-            className="w-full rounded-xl border border-fuchsia-400/20 bg-[#241044]/60 py-2 pl-8 pr-3 text-xs text-white placeholder:text-zinc-500 backdrop-blur focus:border-fuchsia-400 focus:outline-none"
-          />
-        </div>
-      </div>
+                {/* Search */}
+                <div className="relative w-full sm:w-64">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Filter questions"
+                    placeholder="Filter questions..."
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900/80 py-2 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none transition"
+                  />
+                </div>
+              </div>
 
-      {/* Category Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setActiveCategory(cat)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
-              activeCategory === cat
-                ? "bg-fuchsia-600 text-white shadow-md shadow-fuchsia-900/40"
-                : "border border-fuchsia-400/20 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
-            }`}
+              {/* Category Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={activeCategory === cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`rounded-lg px-3 py-2 text-xs ${activeCategory === cat
+                            ? "bg-zinc-100 text-zinc-950 font-semibold shadow-xs"
+                            : "border border-zinc-800/80 bg-zinc-900/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+                        }`}
           >
             {cat}
           </button>
@@ -79,10 +79,10 @@ export function ExpandableFAQ() {
       </div>
 
       {/* Accordion List */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {filteredFaqs.length === 0 ? (
-          <div className="rounded-2xl border border-fuchsia-400/20 bg-white/5 p-8 text-center text-xs text-zinc-400">
-            No FAQ items match &ldquo;{searchQuery}&rdquo;.
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-8 text-center text-xs text-zinc-400">
+            No questions match &ldquo;{searchQuery}&rdquo;.
           </div>
         ) : (
           filteredFaqs.map((faq) => {
@@ -90,7 +90,7 @@ export function ExpandableFAQ() {
             return (
               <div
                 key={faq.id}
-                className="overflow-hidden rounded-2xl border border-fuchsia-400/20 bg-[#241044]/70 shadow-[0_4px_20px_rgba(0,0,0,0.3)] backdrop-blur transition-colors hover:border-fuchsia-400/40"
+                className="overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-900/50 transition-colors hover:border-zinc-700"
               >
                 <button
                   type="button"
@@ -100,33 +100,33 @@ export function ExpandableFAQ() {
                   className="flex w-full items-center justify-between p-4 text-left transition cursor-pointer"
                 >
                   <div className="flex items-center gap-3 pr-4">
-                    <span className="rounded bg-fuchsia-500/20 px-2 py-0.5 text-[10px] font-bold text-fuchsia-300">
+                    <span className="rounded border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-mono text-zinc-400">
                       {faq.category}
                     </span>
-                    <span className="text-sm font-semibold text-white">{faq.question}</span>
+                    <span className="text-sm font-medium text-zinc-200">{faq.question}</span>
                   </div>
                   <div
-                    className={`grid size-7 shrink-0 place-items-center rounded-lg bg-white/5 text-fuchsia-300 transition-transform duration-200 ${
-                      isOpen ? "rotate-180 bg-fuchsia-500/20 text-white" : ""
-                    }`}
-                  >
-                    <ChevronDown size={16} />
+                    className={`grid size-6 shrink-0 place-items-center rounded border border-zinc-800 bg-zinc-950 text-zinc-400 transition-transform duration-200 ${isOpen ? "rotate-180 text-zinc-100 border-zinc-700" : ""
+                    }`
+                }
+                >
+                    <ChevronDown size={14} />
                   </div>
-                </button>
+            </button>
 
-                {isOpen && (
-                  <div
-                    id={`faq-answer-${faq.id}`}
-                    className="border-t border-fuchsia-400/15 px-4 pb-4 pt-3 text-xs leading-relaxed text-zinc-300 animate-in fade-in duration-200"
-                  >
-                    {faq.answer}
-                  </div>
-                )}
+            {isOpen && (
+              <div
+                id={`faq-answer-${faq.id}`}
+                className="border-t border-zinc-800/60 bg-zinc-950/40 px-4 pb-4 pt-3 text-xs leading-relaxed text-zinc-400"
+              >
+                {faq.answer}
               </div>
-            );
+            )}
+          </div>
+          );
           })
         )}
-      </div>
-    </section>
-  );
+        </div>
+      </section>
+      );
 }

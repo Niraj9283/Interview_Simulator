@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck, Lock, Video, Server, Trash2, ArrowLeft } from "lucide-react";
+import { Lock, Video, Server, Trash2, ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -10,33 +10,30 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="mx-auto min-h-[85vh] max-w-4xl px-4 py-14 sm:px-6">
+    <div className="mx-auto min-h-[68vh] reading-page max-w-4xl px-4 py-14 sm:px-6">
       {/* Header */}
       <div className="mb-10 space-y-3">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-[#888888] hover:text-white transition mb-2"
+          className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink transition mb-2"
         >
           <ArrowLeft size={14} />
           <span>Back to Simulator</span>
         </Link>
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-          <ShieldCheck size={14} />
-          <span>Privacy & Governance</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+
+        <h1 className="text-3xl sm:text-4xl font-semibold text-ink tracking-tight">
           Privacy Policy
         </h1>
-        <p className="text-xs text-[#888888] font-mono">
+        <p className="text-xs text-muted font-mono">
           Last Updated: October 2026 &bull; Effective Immediately
         </p>
       </div>
 
-      <div className="space-y-8 text-xs sm:text-sm text-[#A0A0A0] leading-relaxed">
+      <div className="space-y-8 text-xs sm:text-sm text-muted leading-relaxed">
         {/* Section 1: Overview */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Lock size={18} className="text-[#FF4D3D]" />
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+            <Lock size={18} className="text-moss" />
             <span>1. Overview & Privacy Principles</span>
           </h2>
           <p>
@@ -48,15 +45,15 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 2: Camera & Microphone */}
-        <section className="rounded-2xl border border-emerald-500/20 bg-emerald-950/10 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-emerald-300 flex items-center gap-2">
+        <section className="rounded-xl border border-emerald-500/20 bg-emerald-50 p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-emerald-800 flex items-center gap-2">
             <Video size={18} />
             <span>2. Zero-Storage Video & Local Audio Processing</span>
           </h2>
-          <p className="text-neutral-200 font-medium">
+          <p className="text-ink font-medium">
             We operate an uncompromising Zero-Storage policy regarding your camera video and raw audio streams:
           </p>
-          <ul className="list-disc pl-5 space-y-1.5 text-neutral-300">
+          <ul className="list-disc pl-5 space-y-1.5 text-ink">
             <li>
               <strong>Video Landmarker Edge Engine:</strong> When you grant camera access, visual facial landmarking
               (468 face coordinate mesh, eye contact, head orientation) is calculated <strong>100% locally in your
@@ -76,9 +73,9 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 3: Information Collected */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Server size={18} className="text-[#FF4D3D]" />
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+            <Server size={18} className="text-moss" />
             <span>3. Account & Simulation Information Collected</span>
           </h2>
           <p>
@@ -94,8 +91,8 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 4: Data Isolation & RLS */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">4. Row-Level Security & Data Isolation</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">4. Row-Level Security & Data Isolation</h2>
           <p>
             Your interview sessions, performance metrics, and resumes are strictly bound to your account ID via
             relational foreign keys. Queries and mutations enforce user isolation so that no user can view, alter,
@@ -105,8 +102,8 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 5: Cookies & Sessions */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">5. Cookies & Session Storage</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">5. Cookies & Session Storage</h2>
           <p>
             We use strictly necessary <strong>HttpOnly, Secure, SameSite=Lax</strong> cookies for authentication.
             Because tokens are kept in HttpOnly cookies, malicious scripts cannot extract your credentials from
@@ -116,8 +113,8 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 6: Analytics & Third Parties */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">6. Analytics & Error Monitoring</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">6. Analytics & Error Monitoring</h2>
           <p>
             We use Vercel Analytics and Sentry monitoring to detect crashes, calculate page speed, and enhance
             platform stability. These services are configured with automated PII scrubbing — passwords, JWT tokens,
@@ -126,16 +123,16 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 7: Account Deletion */}
-        <section className="rounded-2xl border border-red-500/20 bg-red-950/10 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-red-300 flex items-center gap-2">
+        <section className="rounded-xl border border-red-500/20 bg-red-50 p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-red-800 flex items-center gap-2">
             <Trash2 size={18} />
             <span>7. Right to Deletion (GDPR & CCPA Compliance)</span>
           </h2>
-          <p className="text-neutral-300">
+          <p className="text-ink">
             You maintain full ownership of your data. You may execute a complete, permanent account erasure at any
             time from <strong>Settings &gt; Security Settings &gt; Danger Zone</strong>.
           </p>
-          <p className="text-neutral-300">
+          <p className="text-ink">
             Upon confirmation, our backend executes a transactional database purge deleting all your interview
             sessions, evaluations, scores, resumes, and user records. Active sessions are revoked immediately.
             Please note that protected offline backups expire and roll off according to our 7-day retention cycle.
@@ -143,15 +140,15 @@ export default function PrivacyPolicyPage() {
         </section>
 
         {/* Section 8: Contact */}
-        <section className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 backdrop-blur space-y-3">
-          <h2 className="text-base font-bold text-white">8. Contact & Data Protection Inquiries</h2>
+        <section className="rounded-xl border border-line bg-white p-6 backdrop-blur space-y-3">
+          <h2 className="text-base font-semibold text-ink">8. Contact & Data Protection Inquiries</h2>
           <p>
             If you have questions or requests regarding your personal data or privacy rights, please reach out to:
           </p>
-          <div className="rounded-xl border border-[#222222] bg-[#161616] p-4 text-xs font-mono text-[#D4D4D4] space-y-1">
+          <div className="rounded-xl border border-line bg-white p-4 text-xs font-mono text-ink space-y-1">
             <p><strong>MockMate AI Privacy & Data Protection</strong></p>
-            <p>Email: <a href="mailto:privacy@mockmate.ai" className="text-[#FF4D3D] hover:underline">privacy@mockmate.ai</a></p>
-            <p>Support: <Link href="/#contact" className="text-[#FF4D3D] hover:underline">Interactive Feedback Center</Link></p>
+            <p>Email: <a href="mailto:privacy@mockmate.ai" className="text-moss hover:underline">privacy@mockmate.ai</a></p>
+            <p>Support: <Link href="/#contact" className="text-moss hover:underline">Interactive Feedback Center</Link></p>
           </div>
         </section>
       </div>

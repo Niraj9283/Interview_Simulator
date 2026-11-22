@@ -69,5 +69,8 @@ next-dev*.log
 # Deployment & Vercel
 .vercel
 
-# Artifacts
+# Artifacts & Temporary Outputs
 /artifacts/
+/output/
+/tmp/
+

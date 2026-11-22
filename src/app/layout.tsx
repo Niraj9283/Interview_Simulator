@@ -1,31 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-import InteractiveBackground from "@/components/interactive-background";
+import localFont from "next/font/local";
+
 import { AppFeatureShell } from "@/components/features/app-feature-shell";
 import { StructuredData } from "@/components/seo/structured-data";
 import { AuthProvider } from "@/lib/auth-context";
 import { Analytics } from "@vercel/analytics/react";
 
-// Feature #21: Font Optimization via next/font with zero external requests & swap display
-const sansFont = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans",
-  preload: true,
-});
-
-const monoFont = JetBrains_Mono({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-mono",
-  preload: true,
-});
+const geist = localFont({ src: "./fonts/geist-latin.woff2", variable: "--studio-sans", display: "swap", weight: "100 900" });
 
 export const viewport: Viewport = {
-  themeColor: "#080808",
-  colorScheme: "dark",
+  themeColor: "#f7f8f3",
+  colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
 };
@@ -112,7 +99,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${sansFont.variable} ${monoFont.variable}`}
+      className={`${geist.variable} h-full antialiased font-sans`}
       data-theme="dark"
     >
       <head>
@@ -120,7 +107,6 @@ export default function RootLayout({
         <StructuredData />
       </head>
       <body className="min-h-full font-sans">
-        <InteractiveBackground />
         <AuthProvider>
           <AppFeatureShell>{children}</AppFeatureShell>
         </AuthProvider>

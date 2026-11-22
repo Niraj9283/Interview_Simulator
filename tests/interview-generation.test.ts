@@ -19,6 +19,7 @@ import {
   UNRELATED_TECHNICAL_JARGON,
 } from "../src/lib/role-database";
 import { InterviewerPersonaId } from "../src/lib/interviewer-personalities";
+import { analyzeResume, buildPersonalizedQuestionPlan, buildResumeFollowUp } from "../src/lib/resume-intelligence";
 
 const ML_PYTHON_RESUME = `
 Niraj Kumar - Senior Machine Learning Engineer
@@ -38,6 +39,23 @@ Experience:
 - Optimized SQL database indexing with B-Trees and resolved replication lag.
 - Led CI/CD automation and code review processes.
 `;
+
+describe("Resume-aware question planning", () => {
+  it("keeps evidence-backed project and skill questions in a technical plan", () => {
+    const resume = analyzeResume(`Jane Doe\nProjects\nInsight API: Built a FastAPI service with PostgreSQL and Docker.\nSkills\nPython, FastAPI, PostgreSQL, Docker`);
+    const plan = buildPersonalizedQuestionPlan({
+      profile: resume,
+      department: "Technical",
+      targetRole: "Software Engineer",
+      track: "Role Specific",
+    });
+    assert.ok(plan.some((item) => item.category === "project" && item.question.includes("Insight API")));
+    assert.ok(plan.some((item) => item.category === "skill" && item.question.includes("FastAPI")));
+    const projectQuestion = plan.find((item) => item.category === "project");
+    assert.ok(projectQuestion);
+    assert.match(buildResumeFollowUp("I used FastAPI with Docker.", projectQuestion!, resume) ?? "", /FastAPI/i);
+  });
+});
 
 function assertNoUnrelatedTechJargon(question: string, context: string) {
   const qLower = question.toLowerCase();

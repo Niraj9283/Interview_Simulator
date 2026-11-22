@@ -1,5 +1,7 @@
 "use client";
 
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
+
 import React, { useState, useEffect, useCallback } from "react";
 import {
   MessageSquare,
@@ -39,6 +41,8 @@ export function FloatingContactButton({
   const [selectedModuleId, setSelectedModuleId] = useState<string>("behavioral-star-rubric");
 
   const isOpen = isOpenExternal !== undefined ? isOpenExternal : internalOpen;
+
+  const dialogRef = useDialogFocus(isOpen);
 
   const setIsOpen = useCallback(
     (val: boolean) => {
@@ -211,24 +215,10 @@ export function FloatingContactButton({
         }}
         aria-label={isOpen ? "Close FAQ and Help" : "Open Frequently Asked Questions and Help"}
         aria-expanded={isOpen}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#D9362B] to-[#FF4D3D] p-0.5 text-white shadow-[0_0_24px_rgba(255,77,61,0.5)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_35px_rgba(255,77,61,0.75)] active:scale-95 cursor-pointer print:hidden"
-        title={isOpen ? "Close FAQ" : "Frequently Asked Questions & Help"}
+        className="help-launcher print:hidden"
+        title={isOpen ? "Close help center" : "Help center"}
       >
-        <div className="flex size-full items-center justify-center rounded-[14px] bg-[#111111] backdrop-blur-sm pointer-events-none">
-          {isOpen ? (
-            <X size={22} className="text-[#FF4D3D] transition-transform duration-200 rotate-90 animate-in spin-in-90" />
-          ) : (
-            <MessageSquare size={22} className="text-[#F5F5F5] transition-transform group-hover:rotate-6" />
-          )}
-        </div>
-
-        {/* Pulsing Notification Dot (visible when closed) */}
-        {!isOpen && (
-          <span className="absolute -top-1 -right-1 flex size-3.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#FF4D3D] opacity-75" />
-            <span className="relative inline-flex size-3.5 rounded-full border-2 border-[#080808] bg-[#FF4D3D] shadow-sm" />
-          </span>
-        )}
+        {isOpen ? <X size={19} /> : <MessageSquare size={19} />}
       </button>
 
       {/* Floating Popover revealed right at the icon position */}
@@ -242,16 +232,17 @@ export function FloatingContactButton({
           />
 
           <div
-            role="dialog"
+            ref={dialogRef}
+          role="dialog"
             aria-modal="true"
             aria-label="Frequently Asked Questions & Support"
-            className="fixed bottom-24 right-4 sm:right-6 z-50 flex flex-col w-[calc(100vw-2rem)] sm:w-[480px] h-[600px] max-h-[82vh] rounded-2xl border border-[#2A2A2A] bg-[#111111]/98 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_35px_rgba(255,77,61,0.15)] backdrop-blur-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200 print:hidden"
+            className="fixed bottom-20 right-4 sm:right-6 z-50 flex flex-col w-[calc(100vw-2rem)] sm:w-[480px] h-[600px] max-h-[calc(100dvh-6rem)] rounded-2xl border border-divider bg-instrument/98  backdrop-blur-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200 print:hidden"
           >
             {/* Header */}
-            <div className="border-b border-[#222222] bg-[#151515] p-4">
+            <div className="border-b border-divider bg-console p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-tr from-[#D9362B] to-[#FF4D3D] text-white shadow-md shadow-[#FF4D3D]/20">
+                  <div className="grid size-9 place-items-center rounded-xl bg-moss text-white shadow-md ">
                     {activeTab === "modules" ? (
                       <Layers size={18} />
                     ) : activeTab === "faq" ? (
@@ -263,17 +254,17 @@ export function FloatingContactButton({
                   <div>
                     <h3 className="text-sm font-bold text-[#F5F5F5] flex items-center gap-1.5">
                       {activeTab === "modules"
-                        ? "Simulator Modules & Rubrics"
+                        ? "Practice modules"
                         : activeTab === "faq"
                         ? "Frequently Asked Questions"
                         : "Contact & Support"}
-                      <span className="rounded-full bg-[#FF4D3D]/10 px-2 py-0.2 text-[9px] font-mono text-[#FF4D3D] border border-[#FF4D3D]/30">
+                      <span className="rounded-full bg-signal/10 px-2 py-0.2 text-[9px] font-mono text-signal border border-signal/30">
                         {activeTab === "modules" ? "Engine" : activeTab === "faq" ? "FAQ" : "Help"}
                       </span>
                     </h3>
                     <p className="text-[11px] text-[#A0A0A0]">
                       {activeTab === "modules"
-                        ? "Scoring rubrics, execution sandbox & speech telemetry"
+                        ? "Explore tools and scoring criteria"
                         : activeTab === "faq"
                         ? "Answers to audio, edge mode & scoring mechanics"
                         : "Reach our engineering team or report an issue"}
@@ -292,13 +283,13 @@ export function FloatingContactButton({
               </div>
 
               {/* Tab Switcher */}
-              <div className="mt-3 flex rounded-xl border border-[#222222] bg-[#080808] p-1 gap-1">
+              <div className="mt-3 flex rounded-xl border border-divider bg-instrument p-1 gap-1">
                 <button
                   type="button"
                   onClick={() => setActiveTab("modules")}
                   className={`flex-1 rounded-lg py-1.5 text-center text-xs font-semibold transition cursor-pointer ${
                     activeTab === "modules"
-                      ? "bg-[#FF4D3D] text-white shadow-sm"
+                      ? "bg-moss text-white shadow-sm"
                       : "text-[#A0A0A0] hover:text-[#F5F5F5]"
                   }`}
                 >
@@ -309,7 +300,7 @@ export function FloatingContactButton({
                   onClick={() => setActiveTab("faq")}
                   className={`flex-1 rounded-lg py-1.5 text-center text-xs font-semibold transition cursor-pointer ${
                     activeTab === "faq"
-                      ? "bg-[#FF4D3D] text-white shadow-sm"
+                      ? "bg-moss text-white shadow-sm"
                       : "text-[#A0A0A0] hover:text-[#F5F5F5]"
                   }`}
                 >
@@ -320,7 +311,7 @@ export function FloatingContactButton({
                   onClick={() => setActiveTab("contact")}
                   className={`flex-1 rounded-lg py-1.5 text-center text-xs font-semibold transition cursor-pointer ${
                     activeTab === "contact"
-                      ? "bg-[#FF4D3D] text-white shadow-sm"
+                      ? "bg-moss text-white shadow-sm"
                       : "text-[#A0A0A0] hover:text-[#F5F5F5]"
                   }`}
                 >
@@ -331,9 +322,9 @@ export function FloatingContactButton({
 
             {/* Content Area */}
             {activeTab === "modules" ? (
-              <div className="flex-1 flex flex-col overflow-hidden bg-[#0e0e0e]">
+              <div className="flex-1 flex flex-col overflow-hidden bg-instrument">
                 {/* Horizontal Module Chips */}
-                <div className="p-3 border-b border-[#222222] bg-[#111111] overflow-x-auto scrollbar-none flex items-center gap-1.5">
+                <div className="p-3 border-b border-divider bg-instrument overflow-x-auto scrollbar-none flex items-center gap-1.5">
                   {SIMULATOR_MODULES.map((mod) => (
                     <button
                       key={mod.id}
@@ -341,8 +332,8 @@ export function FloatingContactButton({
                       onClick={() => setSelectedModuleId(mod.id)}
                       className={`rounded-lg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition cursor-pointer ${
                         selectedModuleId === mod.id
-                          ? "bg-[#FF4D3D] text-white shadow-sm"
-                          : "border border-[#262626] bg-[#161616] text-[#A0A0A0] hover:bg-white/10 hover:text-white"
+                          ? "bg-moss text-white shadow-sm"
+                          : "border border-divider bg-console text-[#A0A0A0] hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       {mod.shortTitle}
@@ -359,9 +350,9 @@ export function FloatingContactButton({
                   return (
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                       {/* Title & Tagline Card */}
-                      <div className="rounded-xl border border-[#222222] bg-[#141414] p-3.5 space-y-2">
+                      <div className="rounded-xl border border-divider bg-console p-3.5 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="rounded-full bg-[#FF4D3D]/10 px-2 py-0.5 text-[10px] font-mono font-bold text-[#FF4D3D] border border-[#FF4D3D]/30">
+                          <span className="rounded-full bg-signal/10 px-2 py-0.5 text-[10px] font-mono font-bold text-signal border border-signal/30">
                             {activeModule.badge}
                           </span>
                           <span className="text-[10px] text-[#777777] font-mono">
@@ -385,9 +376,9 @@ export function FloatingContactButton({
                           {activeModule.highlights.map((h, i) => (
                             <div
                               key={i}
-                              className="rounded-xl border border-[#222222] bg-[#121212] p-2.5 space-y-1"
+                              className="rounded-xl border border-divider bg-instrument p-2.5 space-y-1"
                             >
-                              <div className="text-xs font-semibold text-[#FF4D3D]">
+                              <div className="text-xs font-semibold text-signal">
                                 {h.label}
                               </div>
                               <div className="text-[11px] leading-relaxed text-[#A0A0A0]">
@@ -403,7 +394,7 @@ export function FloatingContactButton({
                         <div className="text-[11px] font-bold uppercase tracking-wider text-[#A0A0A0]">
                           Scoring Rubric & Weights
                         </div>
-                        <div className="rounded-xl border border-[#222222] bg-[#121212] divide-y divide-[#222222] overflow-hidden">
+                        <div className="rounded-xl border border-divider bg-instrument divide-y divide-[#222222] overflow-hidden">
                           {activeModule.evaluationRubric.map((rubric, idx) => (
                             <div
                               key={idx}
@@ -417,7 +408,7 @@ export function FloatingContactButton({
                                   {rubric.description}
                                 </div>
                               </div>
-                              <span className="shrink-0 rounded-md bg-[#FF4D3D]/15 border border-[#FF4D3D]/30 px-2 py-0.5 text-[10px] font-bold font-mono text-[#FF4D3D]">
+                              <span className="shrink-0 rounded-md bg-signal/15 border border-signal/30 px-2 py-0.5 text-[10px] font-bold font-mono text-signal">
                                 {rubric.weight}
                               </span>
                             </div>
@@ -440,10 +431,12 @@ export function FloatingContactButton({
                           type="button"
                           onClick={() => {
                             setIsOpen(false);
-                            const el = document.getElementById("main-content");
-                            if (el) el.scrollIntoView({ behavior: "smooth" });
+                            const launch = document.getElementById("launch-practice");
+                            if (launch instanceof HTMLButtonElement) launch.click();
+                            else if (window.location.pathname !== "/") window.location.assign("/");
+                            else document.getElementById("main-content")?.scrollIntoView();
                           }}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-3 py-2 text-xs font-bold text-white shadow-md shadow-[#FF4D3D]/25 transition hover:brightness-110 cursor-pointer"
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-moss px-3 py-2 text-xs font-bold text-white shadow-md transition hover:brightness-110 cursor-pointer"
                         >
                           <Play size={12} fill="white" />
                           <span>Practice in Simulator</span>
@@ -455,7 +448,7 @@ export function FloatingContactButton({
                             setCategory("Feedback");
                             setMessage(`Feedback regarding the ${activeModule.title}: `);
                           }}
-                          className="rounded-xl border border-[#333333] bg-[#161616] px-3 py-2 text-xs font-semibold text-[#A0A0A0] hover:text-white hover:border-[#555555] transition cursor-pointer"
+                          className="rounded-xl border border-divider bg-console px-3 py-2 text-xs font-semibold text-[#A0A0A0] hover:text-white hover:border-[#555555] transition cursor-pointer"
                         >
                           Send Feedback
                         </button>
@@ -465,9 +458,9 @@ export function FloatingContactButton({
                 })()}
               </div>
             ) : activeTab === "faq" ? (
-              <div className="flex-1 flex flex-col overflow-hidden bg-[#0e0e0e]">
+              <div className="flex-1 flex flex-col overflow-hidden bg-instrument">
                 {/* Search & Category Filter Controls */}
-                <div className="p-3.5 space-y-2.5 border-b border-[#222222] bg-[#111111]">
+                <div className="p-3.5 space-y-2.5 border-b border-divider bg-instrument">
                   <div className="relative">
                     <Search
                       size={14}
@@ -478,7 +471,7 @@ export function FloatingContactButton({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search questions..."
-                      className="w-full rounded-xl border border-[#262626] bg-[#161616] py-1.5 pl-8 pr-3 text-xs text-[#F5F5F5] placeholder:text-[#666666] focus:border-[#FF4D3D] focus:outline-none"
+                      className="w-full rounded-xl border border-divider bg-console py-1.5 pl-8 pr-3 text-xs text-[#F5F5F5] placeholder:text-[#666666] focus:border-signal focus:outline-none"
                     />
                   </div>
 
@@ -491,8 +484,8 @@ export function FloatingContactButton({
                         onClick={() => setActiveCategory(cat)}
                         className={`rounded-lg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition cursor-pointer ${
                           activeCategory === cat
-                            ? "bg-[#FF4D3D] text-white shadow-sm"
-                            : "border border-[#262626] bg-[#151515] text-[#A0A0A0] hover:bg-white/10 hover:text-white"
+                            ? "bg-moss text-white shadow-sm"
+                            : "border border-divider bg-console text-[#A0A0A0] hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         {cat}
@@ -504,7 +497,7 @@ export function FloatingContactButton({
                 {/* FAQ Questions Accordion List */}
                 <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
                   {filteredFaqs.length === 0 ? (
-                    <div className="rounded-xl border border-[#222222] bg-[#151515] p-6 text-center text-xs text-[#A0A0A0]">
+                    <div className="rounded-xl border border-divider bg-console p-6 text-center text-xs text-[#A0A0A0]">
                       No questions matched &ldquo;{searchQuery}&rdquo;.
                     </div>
                   ) : (
@@ -513,7 +506,7 @@ export function FloatingContactButton({
                       return (
                         <div
                           key={faq.id}
-                          className="overflow-hidden rounded-xl border border-[#222222] bg-[#151515] shadow-sm transition hover:border-[#333333]"
+                          className="overflow-hidden rounded-xl border border-divider bg-console shadow-sm transition hover:border-divider"
                         >
                           <button
                             type="button"
@@ -522,7 +515,7 @@ export function FloatingContactButton({
                             className="flex w-full items-center justify-between p-3 text-left transition cursor-pointer"
                           >
                             <div className="flex flex-col gap-1 pr-3">
-                              <span className="self-start rounded bg-[#FF4D3D]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#FF4D3D] border border-[#FF4D3D]/20">
+                              <span className="self-start rounded bg-signal/10 px-1.5 py-0.5 text-[9px] font-bold text-signal border border-signal/20">
                                 {faq.category}
                               </span>
                               <span className="text-xs font-semibold leading-snug text-[#F5F5F5]">
@@ -531,7 +524,7 @@ export function FloatingContactButton({
                             </div>
                             <div
                               className={`grid size-6 shrink-0 place-items-center rounded-lg bg-white/5 text-[#A0A0A0] transition-transform duration-200 ${
-                                isOpen ? "rotate-180 bg-[#FF4D3D]/20 text-[#FF4D3D]" : ""
+                                isOpen ? "rotate-180 bg-signal/20 text-signal" : ""
                               }`}
                             >
                               <ChevronDown size={14} />
@@ -539,7 +532,7 @@ export function FloatingContactButton({
                           </button>
 
                           {isOpen && (
-                            <div className="border-t border-[#222222] bg-[#0c0c0c] px-3 pb-3 pt-2 text-[11px] leading-relaxed text-[#A0A0A0] animate-in fade-in duration-150">
+                            <div className="border-t border-divider bg-instrument px-3 pb-3 pt-2 text-[11px] leading-relaxed text-[#A0A0A0] animate-in fade-in duration-150">
                               {faq.answer}
                             </div>
                           )}
@@ -550,11 +543,11 @@ export function FloatingContactButton({
                 </div>
 
                 {/* FAQ Footer Switcher */}
-                <div className="border-t border-[#222222] bg-[#111111] p-2.5 text-center">
+                <div className="border-t border-divider bg-instrument p-2.5 text-center">
                   <button
                     type="button"
                     onClick={() => setActiveTab("contact")}
-                    className="text-[11px] font-medium text-[#FF4D3D] hover:text-[#ff7466] transition cursor-pointer underline underline-offset-2"
+                    className="text-[11px] font-medium text-signal hover:text-[#ff7466] transition cursor-pointer underline underline-offset-2"
                   >
                     Have another question? Send us a message directly →
                   </button>
@@ -562,7 +555,7 @@ export function FloatingContactButton({
               </div>
             ) : (
               /* Contact & Feedback Tab */
-              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#0e0e0e]">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-instrument">
                 {isSuccess && (
                   <FormSuccessState
                     title="Thank you for your feedback!"
@@ -595,7 +588,7 @@ export function FloatingContactButton({
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <label className="flex items-center gap-1 text-[11px] font-semibold text-[#A0A0A0]">
-                        <User size={11} className="text-[#FF4D3D]" />
+                        <User size={11} className="text-signal" />
                         Your Name
                       </label>
                       <input
@@ -603,13 +596,13 @@ export function FloatingContactButton({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Jane Doe"
-                        className="w-full rounded-xl border border-[#262626] bg-[#161616] px-3 py-1.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-[#FF4D3D] focus:outline-none"
+                        className="w-full rounded-xl border border-divider bg-console px-3 py-1.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-signal focus:outline-none"
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="flex items-center gap-1 text-[11px] font-semibold text-[#A0A0A0]">
-                        <Mail size={11} className="text-[#FF4D3D]" />
+                        <Mail size={11} className="text-signal" />
                         Email Address
                       </label>
                       <input
@@ -617,7 +610,7 @@ export function FloatingContactButton({
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="jane@example.com"
-                        className="w-full rounded-xl border border-[#262626] bg-[#161616] px-3 py-1.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-[#FF4D3D] focus:outline-none"
+                        className="w-full rounded-xl border border-divider bg-console px-3 py-1.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-signal focus:outline-none"
                       />
                     </div>
                   </div>
@@ -625,13 +618,13 @@ export function FloatingContactButton({
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <label className="flex items-center gap-1 text-[11px] font-semibold text-[#A0A0A0]">
-                        <Tag size={11} className="text-[#FF4D3D]" />
+                        <Tag size={11} className="text-signal" />
                         Topic / Category
                       </label>
                       <select
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        className="w-full rounded-xl border border-[#262626] bg-[#161616] px-2.5 py-1.5 text-xs text-[#F5F5F5] focus:border-[#FF4D3D] focus:outline-none"
+                        className="w-full rounded-xl border border-divider bg-console px-2.5 py-1.5 text-xs text-[#F5F5F5] focus:border-signal focus:outline-none"
                       >
                         <option value="Feedback">Feature Feedback & Suggestion</option>
                         <option value="Bug">Audio / Speech Bug Report</option>
@@ -643,14 +636,14 @@ export function FloatingContactButton({
                     <div className="space-y-1">
                       <label className="flex items-center justify-between text-[11px] font-semibold text-[#A0A0A0]">
                         <span className="flex items-center gap-1">
-                          <Star size={11} className="text-[#FF4D3D] fill-[#FF4D3D]" />
+                          <Star size={11} className="text-signal fill-signal" />
                           Simulator Rating
                         </span>
                         <span className="text-[10px] text-[#A0A0A0]">
                           {rating === 5 ? "5/5 - Excellent" : rating === 4 ? "4/5 - Good" : rating === 3 ? "3/5 - Average" : rating === 2 ? "2/5 - Fair" : "1/5 - Poor"}
                         </span>
                       </label>
-                      <div className="flex items-center gap-1 h-[34px] px-2 rounded-xl border border-[#262626] bg-[#161616]">
+                      <div className="flex items-center gap-1 h-[34px] px-2 rounded-xl border border-divider bg-console">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
@@ -665,7 +658,7 @@ export function FloatingContactButton({
                               size={15}
                               className={`${
                                 (hoverRating !== null ? star <= hoverRating : star <= rating)
-                                  ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]"
+                                  ? "text-amber-400 fill-amber-400 drop-"
                                   : "text-[#444444]"
                               } transition-colors`}
                             />
@@ -684,7 +677,7 @@ export function FloatingContactButton({
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Describe your question or feedback..."
-                      className="w-full rounded-xl border border-[#262626] bg-[#161616] p-2.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-[#FF4D3D] focus:outline-none resize-none"
+                      className="w-full rounded-xl border border-divider bg-console p-2.5 text-xs text-[#F5F5F5] placeholder:text-[#555555] focus:border-signal focus:outline-none resize-none"
                     />
                   </div>
 
@@ -695,7 +688,7 @@ export function FloatingContactButton({
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#FF4D3D]/25 transition hover:brightness-110 disabled:opacity-50 cursor-pointer active:scale-95"
+                      className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-2 text-xs font-bold text-white shadow-md transition hover:brightness-110 disabled:opacity-50 cursor-pointer active:scale-95"
                     >
                       <Send size={13} />
                       {isSubmitting ? "Sending..." : "Submit Message"}

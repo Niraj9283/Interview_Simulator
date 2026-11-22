@@ -26,7 +26,7 @@ export function StickyHeader({
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      setIsScrolled(window.scrollY > 15);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -35,88 +35,87 @@ export function StickyHeader({
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full transition-all duration-300 print:hidden ${
-        isScrolled
-          ? "border-b border-[#222222] bg-[#080808]/95 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.85)] backdrop-blur-xl"
-          : "border-b border-[#1b1b1b] bg-[#080808]/75 py-3.5 backdrop-blur-md"
-      }`}
+      className={`sticky top - 0 z - 40 transition - all duration - 200 ${
+  isScrolled
+    ? "border-b border-zinc-800/80 bg-zinc-950/90 py-2.5 backdrop-blur-xl shadow-xs"
+    : "border-b border-zinc-800/50 bg-zinc-950/60 py-3 backdrop-blur-md"
+} `}
     >
       <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 lg:px-6">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <a
-            href="#"
-            className="group flex items-center gap-2.5 transition-transform active:scale-95"
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 transition active:scale-98"
             aria-label="MockMate AI Home"
           >
-            <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-[#D9362B] to-[#FF4D3D] text-white shadow-md shadow-[#FF4D3D]/25 group-hover:shadow-[0_0_20px_rgba(255,77,61,0.5)] transition-shadow">
-              <BrainCircuit size={20} />
+            <div className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-950 font-semibold shadow-xs">
+              <BrainCircuit size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-bold tracking-tight text-[#F5F5F5]">MockMate<span className="text-[#FF4D3D]">.AI</span></span>
-                <span className="hidden sm:inline-flex rounded-full bg-[#FF4D3D]/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-[#FF4D3D] border border-[#FF4D3D]/30">
+                <span className="text-sm font-semibold tracking-tight text-zinc-100">
+                  MockMate<span className="text-zinc-400">.ai</span>
+                </span>
+                <span className="hidden sm:inline-flex rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.2 text-[10px] font-mono text-zinc-400">
                   v2.0
                 </span>
               </div>
-              <p className="text-[11px] text-[#A0A0A0] hidden sm:block font-mono tracking-tight">
-                Autonomous Interview & Evaluation Architecture
-              </p>
             </div>
-          </a>
+          </Link>
         </div>
 
         {/* Center / Navigation Links for desktop */}
-        <nav className="hidden md:flex items-center gap-1 rounded-xl border border-[#222222] bg-[#111111]/80 p-1 backdrop-blur">
+        <nav className="hidden md:flex items-center gap-1 rounded-lg border border-zinc-800/80 bg-zinc-900/60 p-1">
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#F5F5F5] hover:bg-white/5 transition cursor-pointer"
+            className="rounded-md px-3 py-1 text-xs font-medium text-zinc-100 hover:bg-zinc-800 transition cursor-pointer"
           >
             Simulator
           </button>
           <Link
             href="/onboarding"
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#A0A0A0] hover:text-[#F5F5F5] hover:bg-white/5 transition"
+            className="rounded-md px-3 py-1 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
           >
             Setup Guide
           </Link>
           <button
             type="button"
             onClick={onOpenFeedback}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-[#A0A0A0] hover:text-[#F5F5F5] hover:bg-white/5 transition cursor-pointer"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition cursor-pointer"
           >
-            <HelpCircle size={13} className="text-[#FF4D3D]" />
+            <HelpCircle size={13} className="text-zinc-400" />
             FAQ & Help
           </button>
         </nav>
 
         {/* Right side controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <LastUpdatedBadge timestamp={lastUpdated} className="hidden md:inline-flex" />
 
           {/* Search Trigger */}
           <button
             type="button"
             onClick={onOpenSearch}
-            className="flex h-9 items-center gap-2.5 rounded-xl border border-[#262626] bg-[#151515] px-3 text-xs font-medium text-[#A0A0A0] shadow-sm transition hover:border-[#FF4D3D]/50 hover:bg-[#1a1a1a] hover:text-[#F5F5F5] active:scale-95 cursor-pointer"
+            className="flex h-8 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-2.5 text-xs text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200 cursor-pointer"
             aria-label="Search site (Cmd+K)"
             title="Search site (Cmd+K)"
           >
-            <Search size={14} className="text-[#FF4D3D]" />
-            <span className="hidden sm:inline">Search...</span>
-            <kbd className="hidden sm:inline-block rounded border border-[#333333] bg-[#0c0c0c] px-1.5 py-0.5 text-[10px] font-mono text-[#A0A0A0]">
+            <Search size={13} className="text-zinc-500" />
+            <span className="hidden sm:inline text-xs">Search...</span>
+            <kbd className="hidden sm:inline-block rounded border border-zinc-800 bg-zinc-950 px-1 py-0.2 text-[10px] font-mono text-zinc-500">
               ⌘K
             </kbd>
           </button>
 
           {/* Auth State */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5">
             {isAuthenticated && user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Link
                   href="/settings/security"
-                  className="flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#151515] px-3 py-1.5 text-xs font-medium text-[#F5F5F5] hover:border-[#FF4D3D]/40 transition"
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200 hover:border-zinc-700 transition"
                   title="Security and Account Settings"
                 >
                   <span className="size-2 rounded-full bg-emerald-400" />
@@ -125,25 +124,25 @@ export function StickyHeader({
                 <button
                   type="button"
                   onClick={() => logout()}
-                  className="flex size-9 items-center justify-center rounded-xl border border-[#262626] bg-[#151515] text-[#A0A0A0] hover:text-[#FF4D3D] hover:border-[#FF4D3D]/40 transition cursor-pointer"
+                  className="flex size-8 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition cursor-pointer"
                   title="Log Out"
                   aria-label="Log out"
                 >
-                  <LogOut size={15} />
+                  <LogOut size={14} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Link
                   href="/login"
-                  className="flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#151515] px-3 py-1.5 text-xs font-medium text-[#F5F5F5] hover:border-[#FF4D3D]/40 transition"
+                  className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200 hover:border-zinc-700 hover:text-white transition"
                 >
-                  <LogIn size={13} className="text-[#FF4D3D]" />
+                  <LogIn size={13} className="text-zinc-400" />
                   <span>Sign In</span>
                 </Link>
                 <Link
                   href="/register"
-                  className="flex items-center rounded-xl bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-[#FF4D3D]/20 hover:brightness-110 transition"
+                  className="flex items-center rounded-lg bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-950 hover:bg-white transition shadow-xs"
                 >
                   Register
                 </Link>

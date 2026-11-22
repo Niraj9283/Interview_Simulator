@@ -134,43 +134,33 @@ export function SystemDesignCanvas({
     setSelectedNodeId(null);
   }
 
-  // Handle Drag Start
-  function handleNodeMouseDown(event: React.MouseEvent, nodeId: string) {
-    event.stopPropagation();
-    const node = diagram.nodes.find((n) => n.id === nodeId);
-    if (!node || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    setDraggingNodeId(nodeId);
-    setDragOffset({
-      x: mouseX - node.x,
-      y: mouseY - node.y,
-    });
-    setSelectedNodeId(nodeId);
+  function canvasPoint(event: React.PointerEvent) {
+    const transform = canvasRef.current?.getScreenCTM();
+    return transform && new DOMPoint(event.clientX, event.clientY).matrixTransform(transform.inverse());
   }
 
-  // Handle Dragging
-  function handleCanvasMouseMove(event: React.MouseEvent) {
-    if (!draggingNodeId || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    const newX = Math.max(20, Math.min(840, mouseX - dragOffset.x));
-    const newY = Math.max(20, Math.min(380, mouseY - dragOffset.y));
-
+  function moveNode(id: string, x: number, y: number) {
+    const position = { x: Math.max(0, Math.min(750, x)), y: Math.max(0, Math.min(352, y)) };
     onChange({
-      nodes: diagram.nodes.map((n) => (n.id === draggingNodeId ? { ...n, x: newX, y: newY } : n)),
+      nodes: diagram.nodes.map(node => node.id === id ? { ...node, ...position } : node),
       edges: diagram.edges,
     });
   }
 
-  function handleCanvasMouseUp() {
-    setDraggingNodeId(null);
+  function startDrag(event: React.PointerEvent<SVGGElement>, node: ArchitecturalNode) {
+    if (!event.isPrimary || event.button !== 0 || connectingFromNodeId) return;
+    const point = canvasPoint(event);
+    if (!point) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragOffset({ x: point.x - node.x, y: point.y - node.y });
+    setDraggingNodeId(node.id);
+    setSelectedNodeId(node.id);
+  }
+
+  function dragNode(event: React.PointerEvent) {
+    if (!draggingNodeId || !event.isPrimary) return;
+    const point = canvasPoint(event);
+    if (point) moveNode(draggingNodeId, point.x - dragOffset.x, point.y - dragOffset.y);
   }
 
   // Helper to find node by ID
@@ -183,22 +173,22 @@ export function SystemDesignCanvas({
   const selectedNode = diagram.nodes.find((n) => n.id === selectedNodeId);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-white shadow-xl">
+    <div className="flex flex-1 flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-white shadow-sm">
       {/* Top Toolbar: Presets & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
-          <div className="grid size-8 place-items-center rounded-lg bg-purple-600/20 text-purple-400 border border-purple-500/30">
+          <div className="grid size-8 place-items-center rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
             <BrainCircuit size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-white">Interactive Architectural Whiteboard</h3>
+              <h3 className="text-sm font-bold text-white">Architecture canvas</h3>
               <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
                 {targetScale}
               </span>
             </div>
             <p className="text-[11px] text-zinc-400 font-mono">
-              Drag components, draw connectors & eliminate Single Points of Failure
+              Drag components or use arrow keys to move a focused component.
             </p>
           </div>
         </div>
@@ -230,7 +220,7 @@ export function SystemDesignCanvas({
 
       {/* Component Palette Bar */}
       <div className="flex flex-wrap items-center gap-1.5 bg-zinc-900/70 p-2 rounded-xl border border-zinc-800 text-xs">
-        <span className="text-[10px] font-mono font-bold text-purple-400 uppercase px-1">
+        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase px-1">
           Add Tier:
         </span>
         {(Object.keys(ARCHITECTURAL_NODE_DEFS) as ArchitecturalNodeType[]).slice(0, 8).map((type) => {
@@ -241,9 +231,9 @@ export function SystemDesignCanvas({
               key={type}
               type="button"
               onClick={() => handleAddNode(type)}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-950 hover:bg-purple-950/70 px-2.5 py-1 text-[11px] font-mono text-zinc-200 border border-zinc-800 hover:border-purple-500/50 transition cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-950 hover:bg-emerald-950/70 px-2.5 py-1 text-[11px] font-mono text-zinc-200 border border-zinc-800 hover:border-emerald-500/50 transition cursor-pointer shadow-2xs"
             >
-              <Icon size={12} className="text-purple-400" />
+              <Icon size={12} className="text-emerald-400" />
               <span>{def.label.split(" ")[0]}</span>
               <Plus size={10} className="text-zinc-500" />
             </button>
@@ -252,14 +242,16 @@ export function SystemDesignCanvas({
       </div>
 
       {/* Interactive SVG Whiteboard Canvas */}
-      <div className="relative rounded-xl border border-zinc-800 bg-[#090d16] overflow-hidden">
+      <div className="rounded-xl border border-divider bg-instrument overflow-hidden">
+        <div className="overflow-x-auto">
         {/* Grid Background Pattern */}
         <svg
           ref={canvasRef}
           viewBox="0 0 880 400"
-          className="w-full h-80 cursor-crosshair select-none"
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
+          className="block w-full min-w-[560px] aspect-[880/400] cursor-crosshair select-none"
+          onPointerMove={dragNode}
+          onPointerUp={() => setDraggingNodeId(null)}
+          onPointerCancel={() => setDraggingNodeId(null)}
           onClick={() => {
             setSelectedNodeId(null);
             setConnectingFromNodeId(null);
@@ -279,7 +271,7 @@ export function SystemDesignCanvas({
               refY="3"
               orient="auto"
             >
-              <polygon points="0 0, 8 3, 0 6" fill="#a855f7" />
+              <polygon points="0 0, 8 3, 0 6" fill="#b3d790" />
             </marker>
           </defs>
 
@@ -308,11 +300,11 @@ export function SystemDesignCanvas({
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke="#a855f7"
+                  stroke="#b3d790"
                   strokeWidth="2"
                   strokeDasharray="4 2"
                   markerEnd="url(#arrowhead)"
-                  className="transition-all group-hover:stroke-purple-300"
+                  className="transition-all group-hover:stroke-emerald-300"
                 />
                 {edge.label && (
                   <text
@@ -341,12 +333,27 @@ export function SystemDesignCanvas({
               <g
                 key={node.id}
                 transform={`translate(${node.x}, ${node.y})`}
-                onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={node.label}
+                aria-pressed={isSelected}
+                onPointerDown={(event) => startDrag(event, node)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleNodeClick(node.id);
+                  } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+                    event.preventDefault();
+                    const dx = Number(event.key === "ArrowRight") - Number(event.key === "ArrowLeft");
+                    const dy = Number(event.key === "ArrowDown") - Number(event.key === "ArrowUp");
+                    moveNode(node.id, node.x + dx * 12, node.y + dy * 12);
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleNodeClick(node.id);
                 }}
-                className="cursor-move"
+                className="cursor-move touch-none"
               >
                 {/* Node Outer Shell Box */}
                 <rect
@@ -354,13 +361,13 @@ export function SystemDesignCanvas({
                   height="48"
                   rx="8"
                   fill="#0f172a"
-                  stroke={isSelected ? "#ec4899" : isConnecting ? "#a855f7" : "#334155"}
+                  stroke={isSelected ? "#dbec9a" : isConnecting ? "#b3d790" : "#334155"}
                   strokeWidth={isSelected ? "2.5" : "1.5"}
-                  className="transition-all hover:stroke-purple-400 filter drop-shadow-md"
+                  className="transition-all hover:stroke-emerald-400 filter drop-shadow-md"
                 />
 
                 {/* Left Color Accent Bar */}
-                <rect width="5" height="48" rx="2" fill="#8b5cf6" />
+                <rect width="5" height="48" rx="2" fill="#96b78e" />
 
                 {/* Node Title */}
                 <text
@@ -391,18 +398,18 @@ export function SystemDesignCanvas({
                     cx="124"
                     cy="24"
                     r="4.5"
-                    fill="#ec4899"
-                    className="animate-ping"
+                    fill="#dbec9a"
                   />
                 )}
               </g>
             );
           })}
         </svg>
+        </div>
 
         {/* Floating Node Action Bar (when node is selected) */}
         {selectedNode && (
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between rounded-lg bg-zinc-900/95 p-2 px-3 border border-zinc-700 backdrop-blur text-xs">
+          <div className="flex flex-wrap gap-2 items-center justify-between rounded-lg bg-zinc-900/95 p-2 px-3 border border-zinc-700 backdrop-blur text-xs">
             <div className="flex items-center gap-2">
               <span className="font-bold text-white font-mono">{selectedNode.label}</span>
               <span className="text-[10px] text-zinc-400 font-mono">({selectedNode.sublabel})</span>
@@ -413,8 +420,8 @@ export function SystemDesignCanvas({
                 onClick={() => setConnectingFromNodeId(selectedNode.id)}
                 className={`rounded px-2.5 py-1 text-[10px] font-mono font-bold transition cursor-pointer ${
                   connectingFromNodeId === selectedNode.id
-                    ? "bg-purple-600 text-white animate-pulse"
-                    : "bg-zinc-800 text-purple-300 hover:bg-zinc-700"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-zinc-800 text-emerald-300 hover:bg-zinc-700"
                 }`}
               >
                 {connectingFromNodeId === selectedNode.id ? "Click Target Node to Connect" : "+ Connect Arrow"}

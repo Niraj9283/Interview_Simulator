@@ -19,6 +19,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from fastapi import (
@@ -69,6 +70,7 @@ from app.models import (
     VerifyEmailRequest,
 )
 from app.sanitization import sanitize_filename, sanitize_text
+from app.services.resume_intelligence import parse_resume
 from app.security import (
     create_access_token,
     generate_secure_token,
@@ -722,13 +724,23 @@ async def upload_resume_rag(
             )
 
         safe_filename = sanitize_filename(file.filename)
-        if safe_filename.lower().endswith(".pdf"):
+        extension = Path(safe_filename).suffix.lower()
+        if extension not in {".pdf", ".txt", ".md", ".csv"}:
+            raise HTTPException(status_code=400, detail="Supported resume files are PDF and UTF-8 text (.txt, .md, .csv).")
+        if extension == ".pdf":
+            if not content.startswith(b"%PDF-"):
+                raise HTTPException(status_code=400, detail="The uploaded PDF does not have a valid PDF signature.")
             try:
                 text = get_rag_engine().extract_text_from_pdf(content)
             except ValueError as err:
                 raise HTTPException(status_code=400, detail=str(err)) from err
         else:
-            text = content.decode("utf-8", errors="ignore")
+            if b"\x00" in content:
+                raise HTTPException(status_code=400, detail="The text resume contains invalid binary content.")
+            try:
+                text = content.decode("utf-8-sig", errors="strict")
+            except UnicodeDecodeError as err:
+                raise HTTPException(status_code=400, detail="Text resumes must use UTF-8 encoding.") from err
     elif raw_text:
         text = raw_text
 
@@ -739,6 +751,7 @@ async def upload_resume_rag(
     chunks_count = get_rag_engine().index_resume(text, candidate_name=clean_candidate_name)
     skills = get_rag_engine()._extract_skills_from_text(text)
     keywords, summary = get_interview_engine().analyze_resume(text, "Candidate Role")
+    structured_profile = parse_resume(text).to_dict()
 
     # Link resume to authenticated user if logged in
     if current_user and current_user.get("user_id"):
@@ -753,8 +766,9 @@ async def upload_resume_rag(
         status="success",
         chunks_indexed=chunks_count,
         extracted_skills=skills,
-        extracted_text=text[:2000],
+        extracted_text=text,
         summary=summary,
+        profile=structured_profile,
     )
 
 
@@ -784,7 +798,7 @@ async def analyze_resume(payload: ResumeAnalyzeRequest) -> ResumeAnalyzeResponse
 
     get_rag_engine().index_resume(clean_text, candidate_name="Candidate")
     keywords, summary = get_interview_engine().analyze_resume(clean_text, clean_role)
-    return ResumeAnalyzeResponse(keywords=keywords, summary=summary)
+    return ResumeAnalyzeResponse(keywords=keywords, summary=summary, profile=parse_resume(clean_text).to_dict())
 
 
 # ============================================================================
@@ -804,6 +818,7 @@ async def start_interview(
         get_rag_engine().index_resume(payload.profile.resume_text, candidate_name=payload.profile.name)
 
     session_id, question, keywords = get_interview_engine().start_session(payload.profile)
+    session = get_interview_engine().sessions[session_id]
 
     # If user is authenticated, link session to user account
     if current_user and current_user.get("user_id"):
@@ -817,7 +832,13 @@ async def start_interview(
             completed=0,
         )
 
-    return InterviewStartResponse(session_id=session_id, question=question, keywords=keywords)
+    return InterviewStartResponse(
+        session_id=session_id,
+        question=question,
+        keywords=keywords,
+        question_plan=session.question_plan,
+        resume_profile=session.resume_profile.to_dict() if session.resume_profile else {},
+    )
 
 
 @app.post("/api/interview/evaluate", response_model=EvaluationResponse)

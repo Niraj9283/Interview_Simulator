@@ -124,14 +124,14 @@ export function ToastContainer() {
   const getBorderColor = (type: ToastType) => {
     switch (type) {
       case "success":
-        return "border-emerald-500/30 shadow-[0_10px_30px_rgba(16,185,129,0.15)]";
+        return "border-emerald-500/30 shadow-sm";
       case "error":
-        return "border-[#FF4D3D]/40 shadow-[0_10px_30px_rgba(255,77,61,0.25)]";
+        return "border-[#FF4D3D]/40 shadow-sm";
       case "warning":
-        return "border-amber-500/30 shadow-[0_10px_30px_rgba(245,158,11,0.15)]";
+        return "border-amber-500/30 shadow-sm";
       case "info":
       default:
-        return "border-sky-500/30 shadow-[0_10px_30px_rgba(56,189,248,0.15)]";
+        return "border-sky-500/30 shadow-sm";
     }
   };
 
@@ -140,13 +140,13 @@ export function ToastContainer() {
       role="region"
       aria-label="Notifications"
       aria-live="polite"
-      className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none print:hidden"
+      className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2.5 max-w-sm w-[calc(100%-2.5rem)] pointer-events-none print:hidden"
     >
       {toasts.map((item) => (
         <div
           key={item.id}
           role={item.type === "error" ? "alert" : "status"}
-          className={`pointer-events-auto flex items-start gap-3 rounded-xl border bg-[#111111]/95 p-3.5 text-white backdrop-blur-xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-3 ${getBorderColor(
+          className={`pointer-events-auto flex items-start gap-3 rounded-xl border bg-instrument p-3.5 text-white backdrop-blur-xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-3 ${getBorderColor(
             item.type
           )}`}
         >

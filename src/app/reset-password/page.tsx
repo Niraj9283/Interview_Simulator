@@ -3,7 +3,7 @@
 import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BrainCircuit, Lock, ArrowRight, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Lock, ArrowRight, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { evaluatePasswordStrength, validatePasswordMatch } from "@/lib/validation";
 import { PasswordVisibilityToggle } from "@/components/features/password-visibility-toggle";
@@ -61,19 +61,19 @@ function ResetPasswordContent() {
 
   if (!token) {
     return (
-      <div className="flex min-h-[85vh] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#222222] bg-[#121212]/95 p-8 text-center backdrop-blur-xl shadow-2xl">
-          <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400">
+      <div className="flex min-h-[68vh] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+        <div className="account-card w-full max-w-md space-y-6 rounded-xl border border-line bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto grid size-14 place-items-center rounded-xl bg-red-500/10 border border-red-500/30 text-red-800">
             <AlertCircle size={30} />
           </div>
-          <h1 className="text-xl font-bold text-white">Missing Reset Token</h1>
-          <p className="text-xs text-[#A0A0A0]">
+          <h1 className="text-xl font-semibold text-ink">Missing Reset Token</h1>
+          <p className="text-xs text-muted">
             The password reset link is invalid or incomplete. Please request a fresh reset link.
           </p>
           <div className="pt-2">
             <Link
               href="/forgot-password"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#FF4D3D] px-5 py-2.5 text-xs font-bold text-neutral-950 hover:bg-[#ff3826] transition"
+              className="inline-flex items-center gap-2 rounded-xl bg-moss px-5 py-2.5 text-xs font-semibold text-white hover:bg-moss transition"
             >
               Request Password Reset
             </Link>
@@ -84,40 +84,32 @@ function ResetPasswordContent() {
   }
 
   return (
-    <div className="flex min-h-[85vh] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 sm:p-8 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(255,77,61,0.08)]">
+    <div className="flex min-h-[68vh] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <div className="account-card w-full max-w-md space-y-6 rounded-xl border border-line bg-white p-6 sm:p-8">
         {/* Header */}
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#D9362B] to-[#FF4D3D] text-white shadow-md shadow-[#FF4D3D]/30 transition group-hover:scale-105">
-              <BrainCircuit size={22} />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-[#F5F5F5]">
-              MockMate<span className="text-[#FF4D3D]">.AI</span>
-            </span>
-          </Link>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">
             Set new password
           </h1>
-          <p className="mt-1 text-xs text-[#A0A0A0]">
+          <p className="mt-1 text-xs text-muted">
             Choose a strong, unique password to secure your interview preparation account.
           </p>
         </div>
 
         {resetSuccess ? (
           <div className="space-y-4 py-4 text-center animate-in fade-in">
-            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+            <div className="mx-auto grid size-14 place-items-center rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800">
               <CheckCircle2 size={30} />
             </div>
-            <h2 className="text-xl font-bold text-white">Password Updated!</h2>
-            <p className="text-xs text-[#A0A0A0] leading-relaxed">
+            <h2 className="text-xl font-semibold text-ink">Password Updated!</h2>
+            <p className="text-xs text-muted leading-relaxed">
               Your password has been changed successfully and previous active sessions have been
               revoked.
             </p>
             <div className="pt-4">
               <Link
                 href="/login"
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FF4D3D] py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/25 transition hover:bg-[#ff3826]"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-moss py-3 text-sm font-semibold text-white transition hover:bg-moss"
               >
                 <span>Sign in with new password</span>
                 <ArrowRight size={16} />
@@ -129,24 +121,26 @@ function ResetPasswordContent() {
             {generalError && (
               <div
                 role="alert"
-                className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-950/20 p-3 text-xs text-red-200"
+                className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-50 p-3 text-xs text-red-800"
               >
-                <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
+                <AlertCircle size={15} className="text-red-800 shrink-0 mt-0.5" />
                 <p>{generalError}</p>
               </div>
             )}
 
             {/* New Password */}
             <div>
-              <label htmlFor="password" className="block text-xs font-medium text-[#D4D4D4] mb-1">
+              <label htmlFor="password" className="block text-xs font-medium text-ink mb-1">
                 New Password
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#737373]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                   <Lock size={16} />
                 </div>
                 <input
                   id="password"
+                  aria-invalid={Boolean(passwordError)}
+                  aria-describedby={passwordError ? "password-error" : undefined}
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
@@ -157,10 +151,10 @@ function ResetPasswordContent() {
                     if (passwordError) setPasswordError("");
                   }}
                   placeholder="At least 8 characters"
-                  className={`w-full rounded-xl border bg-[#181818] py-2.5 pl-10 pr-10 text-sm text-[#F5F5F5] placeholder:text-[#555555] focus:outline-none transition ${
+                  className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-10 text-sm text-ink placeholder:text-muted focus:outline-none transition ${
                     passwordError
                       ? "border-red-500 focus:border-red-500"
-                      : "border-[#2A2A2A] focus:border-[#FF4D3D]/80"
+                      : "border-line focus:border-moss/80"
                   }`}
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -174,12 +168,12 @@ function ResetPasswordContent() {
               {password && (
                 <div className="mt-2 space-y-1.5 animate-in fade-in">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-[#888888]">Strength:</span>
+                    <span className="text-muted">Strength:</span>
                     <span className="font-semibold" style={{ color: passwordStrength.color }}>
                       {passwordStrength.label}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-[#222222] overflow-hidden">
+                  <div className="h-1.5 w-full rounded-full bg-paper overflow-hidden">
                     <div
                       className="h-full transition-all duration-300"
                       style={{
@@ -190,20 +184,22 @@ function ResetPasswordContent() {
                   </div>
                 </div>
               )}
-              {passwordError && <p className="mt-1 text-xs text-red-400">{passwordError}</p>}
+              {passwordError && <p id="password-error" role="alert" className="mt-1 text-xs text-red-800">{passwordError}</p>}
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-xs font-medium text-[#D4D4D4] mb-1">
+              <label htmlFor="confirmPassword" className="block text-xs font-medium text-ink mb-1">
                 Confirm New Password
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#737373]">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                   <Lock size={16} />
                 </div>
                 <input
                   id="confirmPassword"
+                  aria-invalid={Boolean(confirmError)}
+                  aria-describedby={confirmError ? "confirmPassword-error" : undefined}
                   type={showConfirmPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
@@ -214,10 +210,10 @@ function ResetPasswordContent() {
                     if (confirmError) setConfirmError("");
                   }}
                   placeholder="Repeat new password"
-                  className={`w-full rounded-xl border bg-[#181818] py-2.5 pl-10 pr-10 text-sm text-[#F5F5F5] placeholder:text-[#555555] focus:outline-none transition ${
+                  className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-10 text-sm text-ink placeholder:text-muted focus:outline-none transition ${
                     confirmError
                       ? "border-red-500 focus:border-red-500"
-                      : "border-[#2A2A2A] focus:border-[#FF4D3D]/80"
+                      : "border-line focus:border-moss/80"
                   }`}
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -227,13 +223,13 @@ function ResetPasswordContent() {
                   />
                 </div>
               </div>
-              {confirmError && <p className="mt-1 text-xs text-red-400">{confirmError}</p>}
+              {confirmError && <p id="confirmPassword-error" role="alert" className="mt-1 text-xs text-red-800">{confirmError}</p>}
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#FF4D3D] py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/25 transition hover:bg-[#ff3826] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-moss py-3 text-sm font-semibold text-white transition hover:bg-moss active:scale-[0.99] disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
                 <>
@@ -258,8 +254,8 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[85vh] items-center justify-center">
-          <Loader2 size={32} className="animate-spin text-[#FF4D3D]" />
+        <div className="flex min-h-[68vh] items-center justify-center">
+          <Loader2 size={32} className="animate-spin text-moss" />
         </div>
       }
     >

@@ -51,11 +51,11 @@ export function LastUpdatedBadge({
 
   return (
     <div
-      className={`inline-flex items-center gap-2 rounded-full border border-[#2A2A2A] bg-[#151515]/90 px-3 py-1 text-xs text-neutral-300 shadow-sm backdrop-blur transition-all ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full border border-divider bg-console/90 px-3 py-1 text-xs text-neutral-300 shadow-sm backdrop-blur transition-all ${className}`}
       title={mounted ? `Timestamp: ${targetDate.toLocaleString()}` : "Timestamp"}
     >
-      <span className="size-2 rounded-full bg-[#FF4D3D] shrink-0 shadow-[0_0_8px_rgba(255,77,61,0.6)]" />
-      <Clock size={13} className="text-[#FF4D3D] shrink-0" />
+      <span className="size-2 rounded-full bg-signal shrink-0 " />
+      <Clock size={13} className="text-signal shrink-0" />
       <span className="font-normal text-neutral-400">
         {prefix}: <span className="font-semibold text-[#F5F5F5]">{mounted ? relativeTime : "Just now"}</span>
       </span>

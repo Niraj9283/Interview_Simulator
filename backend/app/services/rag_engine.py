@@ -64,15 +64,26 @@ class RAGEngine:
         """Extract text from uploaded PDF resume with size and decompression bounds."""
         if len(pdf_bytes) > settings.MAX_UPLOAD_SIZE_BYTES:
             raise ValueError(f"PDF file size ({len(pdf_bytes)} bytes) exceeds maximum limit ({settings.MAX_UPLOAD_SIZE_BYTES} bytes).")
-
-        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        if not pdf_bytes.startswith(b"%PDF-"):
+            raise ValueError("The uploaded file is not a valid PDF document.")
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            if reader.is_encrypted and reader.decrypt("") == 0:
+                raise ValueError("Password-protected PDFs cannot be processed. Upload an unlocked copy.")
+        except ValueError:
+            raise
+        except Exception as err:
+            raise ValueError("The PDF could not be read. It may be damaged or unsupported.") from err
         extracted_pages = []
         # Limit to max 25 pages to prevent unbounded PDF decompression attacks
         for i, page in enumerate(reader.pages[:25]):
             text = page.extract_text()
             if text:
                 extracted_pages.append(sanitize_text(text, max_length=20000))
-        return "\n\n".join(extracted_pages)
+        extracted = "\n\n".join(extracted_pages).strip()
+        if not extracted:
+            raise ValueError("No selectable text was found in this PDF. Please upload a text-based PDF or a UTF-8 text resume.")
+        return extracted
 
 
     def parse_and_chunk_resume(self, resume_text: str, candidate_name: str = "Candidate") -> list[dict[str, Any]]:

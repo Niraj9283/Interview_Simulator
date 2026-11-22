@@ -21,6 +21,7 @@ from app.models import (
     TopicCurriculumNode,
 )
 from app.services.rag_engine import RAGEngine
+from app.services.resume_intelligence import StructuredResume, build_question_plan, parse_resume
 
 
 STOP_WORDS = {
@@ -74,6 +75,8 @@ class InterviewSession:
     profile: CandidateProfile
     keywords: list[str]
     projects: list[StructuredProject] = field(default_factory=list)
+    resume_profile: StructuredResume | None = None
+    question_plan: list[dict[str, Any]] = field(default_factory=list)
     current_difficulty: str = "Standard"
     memory: InterviewerMemory = field(default_factory=InterviewerMemory)
     started_at: float = field(default_factory=time.time)
@@ -1065,15 +1068,23 @@ class InterviewEngine:
     def start_session(self, profile: CandidateProfile) -> tuple[str, str, list[str]]:
         keywords, _summary = self.analyze_resume(profile.resume_text, profile.target_role)
         projects = extract_structured_projects(profile.resume_text)
+        structured_resume = parse_resume(profile.resume_text)
+        role_questions = get_questions_for_profile(profile)
+        # Never let unrelated technical resume content leak into business-role interviews.
+        question_plan = build_question_plan(structured_resume, profile.target_role, role_questions) if profile.department == "Technical" else [
+            {"question": question, "category": "bank"} for question in role_questions
+        ]
         session_id = str(uuid.uuid4())
         session = InterviewSession(
             profile=profile,
             keywords=keywords,
             projects=projects,
+            resume_profile=structured_resume,
+            question_plan=question_plan,
             current_difficulty=profile.difficulty,
         )
         self.sessions[session_id] = session
-        question = generate_initial_question(profile, projects, keywords)
+        question = question_plan[0]["question"] if question_plan else generate_initial_question(profile, projects, keywords)
         return session_id, question, keywords
 
     def evaluate_answer(

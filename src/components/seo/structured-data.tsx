@@ -21,13 +21,6 @@ export function StructuredData() {
       priceCurrency: "USD",
       availability: "https://schema.org/InStock",
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.9",
-      ratingCount: "1280",
-      bestRating: "5",
-      worstRating: "1",
-    },
     featureList: [
       "Real-time speech analytics and WPM cadence metrics",
       "Interactive distributed system design whiteboard canvas",
@@ -44,10 +37,6 @@ export function StructuredData() {
     name: "MockMate AI",
     url: baseUrl,
     logo: `${baseUrl}/icon.svg`,
-    sameAs: [
-      "https://github.com",
-      "https://twitter.com",
-    ],
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "Customer Support",

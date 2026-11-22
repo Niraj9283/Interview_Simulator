@@ -9,6 +9,7 @@ import { BackToTop } from "./back-to-top";
 import { FloatingContactButton } from "./floating-contact-button";
 import { SiteSearchModal } from "./site-search-modal";
 import { ToastContainer } from "@/components/ui/toast";
+import { SiteHeader } from "@/components/navigation/site-header";
 import { SiteFooter } from "@/components/navigation/site-footer";
 import { captureUTM } from "@/lib/utm-tracker";
 import { trackConversion } from "@/lib/conversion-tracking";
@@ -44,10 +45,12 @@ export function AppFeatureShell({ children }: { children: React.ReactNode }) {
       {/* Feature #8: Scroll progress bar */}
       <ScrollProgressBar />
 
+      <SiteHeader onSearch={() => setIsSearchOpen(true)} />
+
       {/* Main app content */}
-      <div id="main-content" tabIndex={-1} className="outline-none min-h-[85vh]">
+      <main id="main-content" tabIndex={-1} className="outline-none">
         {children}
-      </div>
+      </main>
 
       {/* Feature #18: Internal linking site footer */}
       <SiteFooter />
@@ -72,18 +75,18 @@ export function AppFeatureShell({ children }: { children: React.ReactNode }) {
       <SiteSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        onOpenEdgeTopology={() => {
+        onOpenEdgeTopology={isSearchOpen && document.querySelector('[title*="Edge AI"]') ? () => {
           const btn = document.querySelector<HTMLButtonElement>('[title*="Edge AI"]');
           btn?.click();
-        }}
+        } : undefined}
         onOpenIntegrity={() => {
           const btn = document.querySelector<HTMLButtonElement>('[title*="Integrity"]');
-          btn?.click();
+          if (btn) btn.click();
+          else window.dispatchEvent(new CustomEvent("mockmate:open-module", { detail: { moduleId: "gaze-integrity-shield" } }));
         }}
-        onOpenBenchmark={() => {
-          const btn = document.querySelector<HTMLButtonElement>('[title*="Benchmark"]');
-          btn?.click();
-        }}
+        onOpenBenchmark={isSearchOpen && document.getElementById("workspace-benchmark") ? () => {
+          document.getElementById("workspace-benchmark")?.click();
+        } : undefined}
       />
     </ThemeProvider>
   );

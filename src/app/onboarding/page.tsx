@@ -85,7 +85,6 @@ export default function OnboardingPage() {
     setIsTestingMedia(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      // Stop tracks immediately after testing
       stream.getTracks().forEach((track) => track.stop());
       setMediaStatus("granted");
     } catch {
@@ -108,65 +107,64 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="mx-auto min-h-[85vh] max-w-3xl px-4 py-10 sm:px-6">
-      {/* Progress Bar */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between text-xs text-[#888888] mb-2 font-mono">
-          <span>STEP {step} OF 4</span>
-          <span>
-            {step === 1 && "Role & Domain"}
-            {step === 2 && "Resume (Optional)"}
-            {step === 3 && "Edge Device Check"}
-            {step === 4 && "Ready to Simulate"}
-          </span>
-        </div>
-        <div className="h-1.5 w-full rounded-full bg-[#1e1e1e] overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-[#D9362B] to-[#FF4D3D] transition-all duration-300"
-            style={{ width: `${(step / 4) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-[#222222] bg-[#121212]/95 p-6 sm:p-10 backdrop-blur-xl shadow-2xl">
-        {/* ================= STEP 1: Department & Target Role ================= */}
-        {step === 1 && (
-          <div className="space-y-6 animate-in fade-in">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#FF4D3D]/30 bg-[#FF4D3D]/10 px-3 py-1 text-xs font-semibold text-[#FF4D3D] mb-3">
-                <Briefcase size={13} />
-                <span>Interview Personalization</span>
+      <div className="mx-auto min-h-[72vh] max-w-3xl px-4 py-10 sm:px-6">
+        {/* Progress Bar */}
+        <div className="mb-8">
+            <div className="flex items-center justify-between text-xs text-zinc-400 mb-2 font-mono">
+              <span>STEP {step} OF 4</span>
+              <span>
+                {step === 1 && "Role & Domain"}
+                {step === 2 && "Resume Grounding"}
+                {step === 3 && "Edge Device Check"}
+                {step === 4 && "Ready to Simulate"}
+              </span>
+            </div>
+              <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${(step / 4) * 100}%` }}
+                />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                Welcome, {user?.full_name || "Candidate"}!
-              </h1>
-              <p className="mt-1.5 text-xs sm:text-sm text-[#A0A0A0]">
-                Tell us which domain you are preparing for so our AI interviewer generates
-                accurate, role-grounded technical questions.
-              </p>
             </div>
 
-            {/* Department Selection */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#D4D4D4]">
-                1. Select Domain
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {DEPARTMENTS.map((dept) => {
-                  const isSelected = department === dept.id;
-                  return (
-                    <button
-                      key={dept.id}
-                      type="button"
-                      onClick={() => setDepartment(dept.id)}
-                      className={`text-left p-4 rounded-xl border transition cursor-pointer ${
-                        isSelected
-                          ? "border-[#FF4D3D] bg-[#FF4D3D]/10 text-white shadow-md shadow-[#FF4D3D]/10"
-                          : "border-[#222222] bg-[#161616] text-[#A0A0A0] hover:border-[#333333] hover:text-white"
-                      }`}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 p-6 sm:p-10 shadow-2xl backdrop-blur-md">
+                {/* ================= STEP 1: Department & Target Role ================= */}
+                {step === 1 && (
+                  <div className="space-y-6 animate-in fade-in">
+                    <div>
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-mono text-blue-400 mb-3">
+                          <Briefcase size={13} />
+                          <span>Interview Personalization</span>
+                        </div>
+                          <h1 className="text-xl sm:text-2xl font-semibold text-zinc-100 tracking-tight">
+                            Welcome, {user?.full_name || "Candidate"}
+                          </h1>
+                            <p className="mt-1 text-xs sm:text-sm text-zinc-400">
+                              Configure your target track so MockMate generates accurate, role-grounded technical questions.
+                            </p>
+                          </div>
+
+                          {/* Department Selection */}
+                          <div className="space-y-3">
+                              <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400">
+                                1. Select Domain
+                              </label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {DEPARTMENTS.map((dept) => {
+                                  const isSelected = department === dept.id;
+                                  return (
+                                    <button
+                                      key={dept.id}
+                                      type="button"
+                                      onClick={() => setDepartment(dept.id)}
+                                      className={`w-full text-left p-3 rounded-xl border transition cursor-pointer ${
+                                        isSelected
+                                          ? "border-blue-500/60 bg-blue-500/10 text-zinc-100"
+                                          : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                      }`}
                     >
-                      <p className="text-sm font-bold text-white">{dept.name}</p>
-                      <p className="mt-1 text-xs text-[#888888]">{dept.desc}</p>
+                      <p className="text-xs font-medium text-zinc-200">{dept.name}</p>
+                      <p className="mt-1 text-[11px] text-zinc-500">{dept.desc}</p>
                     </button>
                   );
                 })}
@@ -175,7 +173,7 @@ export default function OnboardingPage() {
 
             {/* Target Role input */}
             <div className="space-y-2">
-              <label htmlFor="targetRole" className="block text-xs font-bold uppercase tracking-wider text-[#D4D4D4]">
+              <label htmlFor="targetRole" className="block text-xs font-mono uppercase tracking-wider text-zinc-400">
                 2. Target Job Title
               </label>
               <input
@@ -183,14 +181,14 @@ export default function OnboardingPage() {
                 type="text"
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
-                placeholder="e.g. Senior Backend Engineer, Equity Research Analyst..."
-                className="w-full rounded-xl border border-[#2A2A2A] bg-[#181818] px-4 py-2.5 text-sm text-white placeholder:text-[#555555] focus:border-[#FF4D3D]/80 focus:outline-none transition"
+                placeholder="e.g. Senior Backend Engineer, Machine Learning Engineer..."
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none transition"
               />
             </div>
 
             {/* Experience Level */}
             <div className="space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#D4D4D4]">
+              <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400">
                 3. Seniority Level
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -201,297 +199,292 @@ export default function OnboardingPage() {
                       key={exp.id}
                       type="button"
                       onClick={() => setExperienceLevel(exp.id)}
-                      className={`text-left p-3.5 rounded-xl border transition cursor-pointer ${
-                        isSelected
-                          ? "border-[#FF4D3D] bg-[#FF4D3D]/10 text-white"
-                          : "border-[#222222] bg-[#161616] text-[#A0A0A0] hover:border-[#333333]"
-                      }`}
+                                    className = {`text-left p-3 rounded-xl border transition cursor-pointer ${isSelected
+                                          ? "border-blue-500/60 bg-blue-500/10 text-zinc-100"
+                                          : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                                      }`
+                                  }
                     >
-                      <p className="text-xs font-bold text-white">{exp.name}</p>
-                      <p className="mt-0.5 text-[11px] text-[#888888]">{exp.desc}</p>
+                      <p className="text-xs font-medium text-zinc-200">{exp.name}</p>
+                      <p className="mt-0.5 text-[10px] text-zinc-500">{exp.desc}</p>
                     </button>
-                  );
+                              );
                 })}
-              </div>
-            </div>
+                          </div>
+                      </div>
 
-            <div className="pt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="flex items-center gap-2 rounded-xl bg-[#FF4D3D] px-6 py-3 text-sm font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/25 hover:bg-[#ff3826] transition cursor-pointer"
-              >
-                <span>Continue to Resume</span>
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          </div>
+                      <div className="pt-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setStep(2)}
+                          className="flex items-center gap-2 rounded-lg bg-zinc-100 px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-white transition cursor-pointer"
+                        >
+                          <span>Continue to Resume</span>
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
         )}
 
-        {/* ================= STEP 2: Optional Resume Upload ================= */}
-        {step === 2 && (
-          <div className="space-y-6 animate-in fade-in">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-400 mb-3">
-                <FileText size={13} />
-                <span>Resume Intelligence (Optional)</span>
-              </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">
-                Ground interview questions in your background
-              </h1>
-              <p className="mt-1.5 text-xs text-[#A0A0A0]">
-                Uploading your resume enables our RAG engine to ask specific questions about your
-                past projects. This step is 100% optional — MockMate works seamlessly without it.
-              </p>
-            </div>
+                    {/* ================= STEP 2: Optional Resume Upload ================= */}
+                    {step === 2 && (
+                      <div className="space-y-6 animate-in fade-in">
+                        <div>
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-mono text-blue-400 mb-3">
+                              <FileText size={13} />
+                              <span>Resume Intelligence (Optional)</span>
+                            </div>
+                              <h1 className="text-xl sm:text-2xl font-semibold text-zinc-100 tracking-tight">
+                                Ground interview questions in your background
+                              </h1>
+                                <p className="mt-1 text-xs text-zinc-400">
+                                  Uploading your resume enables our Chroma RAG collection to synthesize project-specific questions. This step is 100% optional.
+                                </p>
+                              </div>
 
-            {/* Upload Area */}
-            <div className="rounded-2xl border-2 border-dashed border-[#2A2A2A] bg-[#161616]/60 p-8 text-center hover:border-[#FF4D3D]/50 transition">
-              <Upload size={32} className="mx-auto mb-3 text-[#FF4D3D]" />
-              <p className="text-sm font-semibold text-white">Upload PDF or Text Resume</p>
-              <p className="mt-1 text-xs text-[#888888]">
-                Drag & drop or browse from device (Max 10MB)
-              </p>
-              <label className="mt-4 inline-block">
-                <input
-                  type="file"
-                  accept=".pdf,.txt"
-                  onChange={handleResumeFile}
-                  className="hidden"
-                />
-                <span className="inline-flex items-center gap-2 rounded-xl bg-[#222222] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2c2c2c] transition cursor-pointer">
-                  {isUploadingResume ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Parsing with RAG Engine...</span>
-                    </>
-                  ) : (
-                    <span>Choose File</span>
-                  )}
-                </span>
-              </label>
-            </div>
+                              {/* Upload Area */}
+                                  <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/60 p-8 text-center hover:border-zinc-700 transition">
+                                    <Upload size={28} className="mx-auto mb-2.5 text-zinc-400" />
+                                    <p className="text-xs font-medium text-zinc-200">Upload PDF or Text Resume</p>
+                                    <p className="mt-1 text-[11px] text-zinc-500">
+                                      Drag and drop or select file (Max 10MB)
+                                    </p>
+                                    <label className="mt-4 inline-block">
+                                      <input
+                                        type="file"
+                                        accept=".pdf,.txt"
+                                        onChange={handleResumeFile}
+                                        className="hidden"
+                                      />
+                                        <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:border-zinc-700 hover:text-white transition cursor-pointer">
+                                          {isUploadingResume ? (
+                                            <>
+                                              <Loader2 size={13} className="animate-spin" />
+                                              <span>Parsing with Chroma RAG...</span>
+                                            </>
+                                          ) : (
+                                            <span>Choose File</span>
+                                          )}
+                                        </span>
+                                    </label>
+                                  </div>
 
-            {/* Extracted Skills Preview */}
-            {resumeSkills.length > 0 && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 animate-in fade-in">
-                <p className="text-xs font-bold text-emerald-300 mb-2 flex items-center gap-1.5">
-                  <CheckCircle2 size={14} />
-                  <span>Successfully Parsed {resumeSkills.length} Technical Skills:</span>
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {resumeSkills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-md border border-emerald-500/20 bg-emerald-900/30 px-2 py-0.5 text-[11px] text-emerald-200"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
+                                  {/* Extracted Skills Preview */}
+                                  {resumeSkills.length > 0 && (
+                                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 animate-in fade-in">
+                                          <p className="text-xs font-medium text-emerald-400 mb-2 flex items-center gap-1.5">
+                                            <CheckCircle2 size={14} />
+                                            <span>Parsed {resumeSkills.length} Technical Skills:</span>
+                                          </p>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {resumeSkills.map((skill) => (
+                                              <span
+                                                key={skill}
+                                                className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-300"
+                                              >
+                                                {skill}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
             )}
 
-            {/* Navigation Buttons */}
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="flex items-center gap-2 rounded-xl border border-[#2A2A2A] px-4 py-2.5 text-xs font-semibold text-[#888888] hover:text-white transition cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                <span>Back</span>
-              </button>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="text-xs text-[#888888] hover:text-white transition font-medium cursor-pointer"
-                >
-                  Skip for now
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="flex items-center gap-2 rounded-xl bg-[#FF4D3D] px-6 py-2.5 text-xs font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/25 hover:bg-[#ff3826] transition cursor-pointer"
-                >
-                  <span>Continue</span>
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
+                                        {/* Navigation Buttons */}
+                                        <div className="pt-4 flex items-center justify-between">
+                                          <button
+                                            type="button"
+                                            onClick={() => setStep(1)}
+                                            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                                          >
+                                            <ArrowLeft size={13} />
+                                            <span>Back</span>
+                                          </button>
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => setStep(3)}
+                                                className="text-xs text-zinc-500 hover:text-zinc-300 transition font-medium px-2 py-2 cursor-pointer"
+                                              >
+                                                Skip for now
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setStep(3)}
+                                                className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-5 py-2 text-xs font-semibold text-zinc-950 hover:bg-white transition cursor-pointer"
+                                              >
+                                                <span>Continue</span>
+                                                <ArrowRight size={13} />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
         )}
 
-        {/* ================= STEP 3: Edge Privacy & Device Permissions ================= */}
-        {step === 3 && (
-          <div className="space-y-6 animate-in fade-in">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 mb-3">
-                <ShieldCheck size={13} />
-                <span>100% Client-Side Privacy Policy</span>
-              </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">
-                Camera & Microphone Privacy Check
-              </h1>
-              <p className="mt-1.5 text-xs text-[#A0A0A0] leading-relaxed">
-                MockMate AI evaluates your speech pace, filler words, pitch variance, and eye contact.
-                <strong>
-                  {" "}All visual landmarker and audio waveform processing runs locally inside your browser via
-                  WASM. Your video feed is NEVER recorded or transmitted to any server.
-                </strong>
-              </p>
-            </div>
+                                        {/* ================= STEP 3: Edge Privacy & Device Permissions ================= */}
+                                        {step === 3 && (
+                                          <div className="space-y-6 animate-in fade-in">
+                                            <div>
+                                                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-mono text-emerald-400 mb-3">
+                                                  <ShieldCheck size={13} />
+                                                  <span>100% Client-Side Edge Privacy</span>
+                                                </div>
+                                                  <h1 className="text-xl sm:text-2xl font-semibold text-zinc-100 tracking-tight">
+                                                    Camera & Microphone Diagnostics
+                                                  </h1>
+                                                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                                                      MockMate AI analyzes speech cadence, pause duration, and eye-contact trajectory.
+                                                      All processing executes in browser memory via MediaPipe and Web Audio. Your video feed is never transmitted or recorded remotely.
+                                                    </p>
+                                                  </div>
 
-            {/* Device Status Box */}
-            <div className="rounded-2xl border border-[#222222] bg-[#161616] p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-9 place-items-center rounded-xl bg-[#222222] text-[#FF4D3D]">
-                    <Video size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">Camera (MediaPipe FaceLandmarker)</p>
-                    <p className="text-[11px] text-[#888888]">Eye-contact and gaze trajectory</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="grid size-9 place-items-center rounded-xl bg-[#222222] text-[#FF4D3D]">
-                    <Mic size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">Microphone (Web Audio API)</p>
-                    <p className="text-[11px] text-[#888888]">WPM, pauses, and speech cadence</p>
-                  </div>
-                </div>
-              </div>
+                                                  {/* Device Status Box */}
+                                                          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                              <div className="flex items-center gap-2.5">
+                                                                <div className="grid size-8 place-items-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400">
+                                                                  <Video size={16} />
+                                                                </div>
+                                                                <div>
+                                                                  <p className="text-xs font-medium text-zinc-200">MediaPipe FaceLandmarker</p>
+                                                                  <p className="text-[10px] text-zinc-500 font-mono">Local eye-contact trajectory</p>
+                                                                </div>
+                                                              </div>
+                                                                  <div className="flex items-center gap-2.5">
+                                                                    <div className="grid size-8 place-items-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400">
+                                                                      <Mic size={16} />
+                                                                    </div>
+                                                                    <div>
+                                                                      <p className="text-xs font-medium text-zinc-200">Web Audio API Telemetry</p>
+                                                                      <p className="text-[10px] text-zinc-500 font-mono">WPM, pauses, and speech steadiness</p>
+                                                                    </div>
+                                                                  </div>
+                                                                </div>
 
-              {/* Status Indicator */}
-              <div className="pt-2 border-t border-[#222222] flex items-center justify-between text-xs">
-                <span>Permission Status:</span>
-                {mediaStatus === "granted" && (
-                  <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                    <CheckCircle2 size={14} />
-                    <span>Microphone & Camera Ready</span>
-                  </span>
+                                                                {/* Status Indicator */}
+                                                                  <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+                                                                    <span className="text-zinc-500">Device Status:</span>
+                                                                    {mediaStatus === "granted" && (
+                                                                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                                                                          <CheckCircle2 size={13} />
+                                                                          <span>Microphone & Camera Verified</span>
+                                                                        </span>
                 )}
-                {mediaStatus === "denied" && (
-                  <span className="text-amber-400 font-semibold">
-                    Permission Denied (Simulation will run in Text Mode)
-                  </span>
+                                                                        {mediaStatus === "denied" && (
+                                                                            <span className="text-amber-400 font-medium">
+                                                                              Permission Denied (Simulation will default to Text Mode)
+                                                                            </span>
                 )}
-                {mediaStatus === "not_tested" && (
-                  <span className="text-[#888888]">Not yet requested</span>
-                )}
-              </div>
+                                                                            {mediaStatus === "not_tested" && (
+                  <span className="text-zinc-500">Not yet verified</span>
+                                                                            )}
+                                                                          </div>
             </div>
 
             {/* Permission Request Button */}
-            <div className="text-center py-2">
-              <button
-                type="button"
-                onClick={testMediaDevices}
-                disabled={isTestingMedia}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#1a1a1a] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#222222] transition cursor-pointer"
-              >
-                {isTestingMedia ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Requesting browser permission...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck size={14} className="text-emerald-400" />
-                    <span>Test Camera & Mic Access</span>
-                  </>
-                )}
-              </button>
-            </div>
+                                                                      <div className="text-center py-1">
+                                                                        <button
+                                                                          type="button"
+                                                                          onClick={testMediaDevices}
+                                                                          disabled={isTestingMedia}
+                                                                          className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-medium text-zinc-200 hover:border-zinc-700 hover:text-white transition cursor-pointer"
+                                                                        >
+                                                                          {isTestingMedia ? (
+                                                                            <>
+                                                                              <Loader2 size={13} className="animate-spin" />
+                                                                              <span>Checking devices...</span>
+                                                                            </>
+                                                                          ) : (
+                                                                            <>
+                                                                              <ShieldCheck size={14} className="text-emerald-400" />
+                                                                              <span>Verify Camera & Microphone</span>
+                                                                            </>
+                                                                          )}
+                                                                        </button>
+                                                                      </div>
 
-            {/* Navigation Buttons */}
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="flex items-center gap-2 rounded-xl border border-[#2A2A2A] px-4 py-2.5 text-xs font-semibold text-[#888888] hover:text-white transition cursor-pointer"
-              >
-                <ArrowLeft size={14} />
-                <span>Back</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                className="flex items-center gap-2 rounded-xl bg-[#FF4D3D] px-6 py-2.5 text-xs font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/25 hover:bg-[#ff3826] transition cursor-pointer"
-              >
-                <span>Continue to Summary</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </div>
+                                                                      {/* Navigation Buttons */}
+                                                                      <div className="pt-4 flex items-center justify-between">
+                                                                        <button
+                                                                          type="button"
+                                                                          onClick={() => setStep(2)}
+                                                                          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                                                                        >
+                                                                          <ArrowLeft size={13} />
+                                                                          <span>Back</span>
+                                                                        </button>
+                                                                        <button
+                                                                          type="button"
+                                                                          onClick={() => setStep(4)}
+                                                                          className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-5 py-2 text-xs font-semibold text-zinc-950 hover:bg-white transition cursor-pointer"
+                                                                        >
+                                                                          <span>Continue to Summary</span>
+                                                                          <ArrowRight size={13} />
+                                                                        </button>
+                                                                      </div>
+                                                                    </div>
         )}
 
-        {/* ================= STEP 4: Ready to Launch ================= */}
-        {step === 4 && (
-          <div className="space-y-6 animate-in fade-in text-center">
-            <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-[#D9362B] to-[#FF4D3D] text-white shadow-xl shadow-[#FF4D3D]/30">
-              <Sparkles size={32} />
-            </div>
+                                                                    {/* ================= STEP 4: Ready to Launch ================= */}
+                                                                    {step === 4 && (
+                                                                      <div className="space-y-6 animate-in fade-in text-center">
+                                                                          <div className="mx-auto grid size-12 place-items-center rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100">
+                                                                            <Sparkles size={24} />
+                                                                          </div>
 
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                You&apos;re All Set for Simulation
-              </h1>
-              <p className="mt-2 text-xs sm:text-sm text-[#A0A0A0] max-w-lg mx-auto">
-                Your profile preferences are calibrated. Launch your first mock interview to get
-                instant speech analytics and personalized study roadmaps.
-              </p>
-            </div>
+                                                                          <div>
+                                                                              <h1 className="text-xl sm:text-2xl font-semibold text-zinc-100 tracking-tight">
+                                                                                Profile Calibrated
+                                                                              </h1>
+                                                                                <p className="mt-1 text-xs text-zinc-400 max-w-md mx-auto">
+                                                                                  Your target track is ready. Start your session to receive real-time speech cadence analytics, live coding tests, and architecture evaluations.
+                                                                                </p>
+                                                                              </div>
 
-            {/* Summary Card */}
-            <div className="mx-auto max-w-md rounded-xl border border-[#222222] bg-[#161616] p-4 text-left text-xs space-y-2">
-              <div className="flex justify-between py-1 border-b border-[#222222]">
-                <span className="text-[#888888]">Target Role:</span>
-                <span className="font-semibold text-white">{targetRole}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-[#222222]">
-                <span className="text-[#888888]">Domain:</span>
-                <span className="font-semibold text-white">{department}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-[#222222]">
-                <span className="text-[#888888]">Seniority:</span>
-                <span className="font-semibold text-white">{experienceLevel}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-[#888888]">Edge Media Mode:</span>
-                <span className="font-semibold text-emerald-400">
-                  {mediaStatus === "granted" ? "Audio & Video Active" : "Text & Speech Enabled"}
-                </span>
-              </div>
-            </div>
+                                                                              {/* Summary Card */}
+                                                                                  <div className="mx-auto max-w-md rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 text-left text-xs space-y-2 font-mono">
+                                                                                    <div className="flex justify-between py-1 border-b border-zinc-850">
+                                                                                      <span className="text-zinc-500">Target Role:</span>
+                                                                                      <span className="font-semibold text-zinc-200">{targetRole}</span>
+                                                                                    </div>
+                                                                                      <div className="flex justify-between py-1 border-b border-zinc-850">
+                                                                                        <span className="text-zinc-500">Domain:</span>
+                                                                                        <span className="font-semibold text-zinc-200">{department}</span>
+                                                                                      </div>
+                                                                                        <div className="flex justify-between py-1 border-b border-zinc-850">
+                                                                                          <span className="text-zinc-500">Seniority:</span>
+                                                                                          <span className="font-semibold text-zinc-200">{experienceLevel}</span>
+                                                                                        </div>
+                                                                                        <div className="flex justify-between py-1">
+                                                                                            <span className="text-zinc-500">Edge Device Status:</span>
+                                                                                            <span className="font-semibold text-emerald-400">
+                                                                                              {mediaStatus === "granted" ? "Microphone & Camera Active" : "Text & Audio Ready"}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                      </div>
 
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleFinish}
-                disabled={isFinishing}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#FF4D3D] px-8 py-3.5 text-sm font-bold text-neutral-950 shadow-lg shadow-[#FF4D3D]/30 hover:bg-[#ff3826] transition cursor-pointer"
-              >
-                {isFinishing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Calibrating engine...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Launch First Mock Interview</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+                                                                                        <div className="pt-2 flex items-center justify-center">
+                                                                                          <button
+                                                                                            type="button"
+                                                                                            onClick={handleFinish}
+                                                                                            disabled={isFinishing}
+                                                                                            className="flex items-center justify-center gap-2 rounded-lg bg-zinc-100 px-6 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-white transition cursor-pointer shadow-xs"
+                                                                                          >
+                                                                                            {isFinishing ? (
+                                                                                              <>
+                                                                                                <Loader2 size={14} className="animate-spin" />
+                                                                                                <span>Calibrating simulator...</span>
+                                                                                              </>
+                                                                                            ) : (
+                                                                                              <>
+                                                                                                <span>Launch First Mock Interview</span>
+                                                                                                <ArrowRight size={14} />
+                                                                                              </>
+                                                                                            )}
+                                                                                          </button>
+                                                                                        </div>
+                                                                                      </div>
         )}
-      </div>
-    </div>
-  );
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  );
 }
