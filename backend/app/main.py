@@ -171,6 +171,7 @@ app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -184,6 +185,29 @@ app.add_middleware(RateLimiterMiddleware)
 
 # 5. Request Payload Size Guard
 app.add_middleware(PayloadSizeLimitMiddleware)
+
+# 6. Vercel Service Prefix Stripper (Outer-most middleware)
+class StripPrefixMiddleware:
+    """
+    Strips /api/backend prefix when Vercel service rewrites forward
+    incoming requests directly to the FastAPI service.
+    """
+    def __init__(self, app, prefix: str = "/api/backend"):
+        self.app = app
+        self.prefix = prefix
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path.startswith(self.prefix):
+                new_path = path[len(self.prefix):] or "/"
+                scope["path"] = new_path
+                if "raw_path" in scope:
+                    scope["raw_path"] = new_path.encode("ascii")
+        await self.app(scope, receive, send)
+
+app.add_middleware(StripPrefixMiddleware)
+
 
 
 # ============================================================================

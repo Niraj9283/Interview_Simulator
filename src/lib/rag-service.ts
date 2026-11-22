@@ -44,11 +44,31 @@ export interface InterviewStartResult {
   resume_profile?: unknown;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export function getBackendUrl(): string {
+  // If explicitly configured to an external origin, respect it
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // In the browser, use the same-origin reverse proxy /api/backend.
+  // This prevents Mixed-Content blocks, CORS blocks, and broken 127.0.0.1 references
+  // on production hosting (e.g. Vercel) while working seamlessly via rewrites locally.
+  if (typeof window !== "undefined") {
+    return "/api/backend";
+  }
+
+  // Server-side (Node.js / SSR)
+  return (
+    process.env.AUTH_BACKEND_URL ||
+    process.env.INTERNAL_API_URL ||
+    "http://127.0.0.1:8000"
+  ).replace(/\/$/, "");
+}
 
 export async function getRAGStatus(): Promise<RAGStatus> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/rag/status`, {
+    const res = await fetch(`${getBackendUrl()}/api/rag/status`, {
       headers: { "Content-Type": "application/json" },
       signal: AbortSignal.timeout(3000),
     });
@@ -89,7 +109,7 @@ export async function uploadResumeRAG(file: File | null, rawText?: string): Prom
       formData.append("raw_text", rawText);
     }
 
-    const res = await fetch(`${BACKEND_URL}/api/rag/resume/upload`, {
+    const res = await fetch(`${getBackendUrl()}/api/rag/resume/upload`, {
       method: "POST",
       body: formData,
       signal: AbortSignal.timeout(6000),
@@ -137,7 +157,7 @@ export async function startPersonalizedInterview(profile: {
   resumeText: string;
 }): Promise<InterviewStartResult | null> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/interview/start`, {
+    const res = await fetch(`${getBackendUrl()}/api/interview/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -165,7 +185,7 @@ export async function queryRAG(
   nResults = 3
 ): Promise<RAGMatch[]> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/rag/query`, {
+    const res = await fetch(`${getBackendUrl()}/api/rag/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

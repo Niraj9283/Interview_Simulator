@@ -65,7 +65,7 @@ export default function OnboardingPage() {
 
     try {
       const res = await apiFetch<{ extracted_skills: string[]; extracted_text: string }>(
-        "/api/rag/resume/upload",
+        "/api/backend/api/rag/resume/upload",
         {
           method: "POST",
           body: formData,
