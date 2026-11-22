@@ -68,34 +68,34 @@ export function getBackendUrl(): string {
 
 export async function getRAGStatus(): Promise<RAGStatus> {
   try {
-    const res = await fetch(`${getBackendUrl()}/api/rag/status`, {
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // Fallback to client status
+      const res = await fetch(`${getBackendUrl()}/api/rag/status`, {
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(3000),
+      });
+      if(res.ok) {
+        return await res.json();
   }
+  } catch {
+  // Fallback to client status
+}
 
-  return {
-    status: "client_active",
-    collections: {
-      candidate_knowledge: {
-        count: 4,
-        description: "Resume sections, projects, and skills",
-      },
-      interview_knowledge: {
-        count: 9,
-        description: "Behavioral, system design, DSA, and HR question bank",
-      },
-      technical_knowledge: {
-        count: 8,
-        description: "Technical rubrics: Python, ML, DL, RAG, LLMs, SQL",
-      },
+return {
+  status: "client_active",
+  collections: {
+    candidate_knowledge: {
+      count: 4,
+      description: "Resume sections, projects, and skills",
     },
-  };
+    interview_knowledge: {
+      count: 9,
+      description: "Behavioral, system design, DSA, and HR question bank",
+    },
+    technical_knowledge: {
+      count: 8,
+      description: "Technical rubrics: Python, ML, DL, RAG, LLMs, SQL",
+    },
+  },
+};
 }
 
 export async function uploadResumeRAG(file: File | null, rawText?: string): Promise<ResumeUploadResult> {
@@ -109,43 +109,43 @@ export async function uploadResumeRAG(file: File | null, rawText?: string): Prom
       formData.append("raw_text", rawText);
     }
 
-    const res = await fetch(`${getBackendUrl()}/api/rag/resume/upload`, {
-      method: "POST",
-      body: formData,
-      signal: AbortSignal.timeout(6000),
-    });
+      const res = await fetch(`${getBackendUrl()}/api/rag/resume/upload`, {
+        method: "POST",
+        body: formData,
+        signal: AbortSignal.timeout(6000),
+      });
 
-    if (res.ok) {
-      return await res.json();
-    }
+      if(res.ok) {
+        return await res.json();
+  }
     const payload = await res.json().catch(() => null);
-    throw new Error(payload?.detail || "The resume could not be processed.");
-  } catch (err) {
-    if (err instanceof Error && !/fetch|timeout|network/i.test(err.message)) {
-      throw err;
-    }
-    console.warn("Backend RAG upload fallback:", err);
+  throw new Error(payload?.detail || "The resume could not be processed.");
+} catch (err) {
+  if (err instanceof Error && !/fetch|timeout|network/i.test(err.message)) {
+    throw err;
   }
+  console.warn("Backend RAG upload fallback:", err);
+}
 
-  // Client-side fallback extraction
-  if (file?.name.toLowerCase().endsWith(".pdf")) {
-    throw new Error("PDF processing is temporarily unavailable. Reconnect to the interview service or upload a UTF-8 text resume.");
-  }
-  const text = rawText || (file ? await file.text() : "");
-  if (!text.trim()) {
-    throw new Error("No readable text was found in this resume.");
-  }
-  const extractedSkills = extractSkillsFromResume(text);
+// Client-side fallback extraction
+if (file?.name.toLowerCase().endsWith(".pdf")) {
+  throw new Error("PDF processing is temporarily unavailable. Reconnect to the interview service or upload a UTF-8 text resume.");
+}
+const text = rawText || (file ? await file.text() : "");
+if (!text.trim()) {
+  throw new Error("No readable text was found in this resume.");
+}
+const extractedSkills = extractSkillsFromResume(text);
 
-  return {
-    status: "success",
-    chunks_indexed: Math.max(1, text.split("\n\n").length),
-    extracted_skills: extractedSkills,
-    extracted_text: text,
-    summary: extractedSkills.length
-      ? `Primary signals: ${extractedSkills.slice(0, 5).join(", ")}.`
-      : "Primary signals parsed from candidate resume.",
-  };
+return {
+  status: "success",
+  chunks_indexed: Math.max(1, text.split("\n\n").length),
+  extracted_skills: extractedSkills,
+  extracted_text: text,
+  summary: extractedSkills.length
+    ? `Primary signals: ${extractedSkills.slice(0, 5).join(", ")}.`
+    : "Primary signals parsed from candidate resume.",
+};
 }
 
 export async function startPersonalizedInterview(profile: {
@@ -157,22 +157,22 @@ export async function startPersonalizedInterview(profile: {
   resumeText: string;
 }): Promise<InterviewStartResult | null> {
   try {
-    const res = await fetch(`${getBackendUrl()}/api/interview/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        profile: {
-          name: profile.name,
-          department: profile.department,
-          target_role: profile.targetRole,
-          domain: profile.domain,
-          difficulty: profile.difficulty,
-          resume_text: profile.resumeText,
-        },
-      }),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
+      const res = await fetch(`${getBackendUrl()}/api/interview/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: {
+            name: profile.name,
+            department: profile.department,
+            target_role: profile.targetRole,
+            domain: profile.domain,
+            difficulty: profile.difficulty,
+            resume_text: profile.resumeText,
+          },
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if(!res.ok) return null;
     return await res.json();
   } catch {
     return null;
@@ -185,26 +185,26 @@ export async function queryRAG(
   nResults = 3
 ): Promise<RAGMatch[]> {
   try {
-    const res = await fetch(`${getBackendUrl()}/api/rag/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        collection_name: collectionName,
-        query,
-        n_results: nResults,
-      }),
-      signal: AbortSignal.timeout(3000),
-    });
+      const res = await fetch(`${getBackendUrl()}/api/rag/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection_name: collectionName,
+          query,
+          n_results: nResults,
+        }),
+        signal: AbortSignal.timeout(3000),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      return data.results || [];
-    }
-  } catch {
-    // Client fallback
+      if(res.ok) {
+        const data = await res.json();
+    return data.results || [];
   }
+  } catch {
+  // Client fallback
+}
 
-  return getClientFallbackMatches(collectionName, query, nResults);
+return getClientFallbackMatches(collectionName, query, nResults);
 }
 
 function extractSkillsFromResume(text: string): string[] {

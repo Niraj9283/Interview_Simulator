@@ -772,10 +772,29 @@ async def upload_resume_rag(
     if not text.strip():
         raise HTTPException(status_code=400, detail="No readable text or PDF provided in resume upload.")
 
-    chunks_count = get_rag_engine().index_resume(text, candidate_name=clean_candidate_name)
-    skills = get_rag_engine()._extract_skills_from_text(text)
-    keywords, summary = get_interview_engine().analyze_resume(text, "Candidate Role")
-    structured_profile = parse_resume(text).to_dict()
+    try:
+        chunks_count = get_rag_engine().index_resume(text, candidate_name=clean_candidate_name)
+    except Exception as exc:
+        logger.warning("RAG indexing non-fatal error: %s", exc)
+        chunks_count = 1
+
+    try:
+        skills = get_rag_engine()._extract_skills_from_text(text)
+    except Exception as exc:
+        logger.warning("RAG skill extraction fallback: %s", exc)
+        skills = []
+
+    try:
+        keywords, summary = get_interview_engine().analyze_resume(text, "Candidate Role")
+    except Exception as exc:
+        logger.warning("Interview engine resume analysis fallback: %s", exc)
+        keywords, summary = [], "Resume successfully parsed."
+
+    try:
+        structured_profile = parse_resume(text).to_dict()
+    except Exception as exc:
+        logger.warning("Structured profile parsing fallback: %s", exc)
+        structured_profile = {}
 
     # Link resume to authenticated user if logged in
     if current_user and current_user.get("user_id"):

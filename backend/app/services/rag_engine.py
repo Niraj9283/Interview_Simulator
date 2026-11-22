@@ -8,8 +8,10 @@ Manages 3 specialized collections:
 
 import io
 import json
+import logging
 import os
 import re
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
@@ -21,21 +23,44 @@ import pypdf
 from app.config import settings
 from app.sanitization import sanitize_text
 
+logger = logging.getLogger("mockmate.rag")
 
-CHROMA_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "chroma_db"
-CHROMA_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+def _get_chroma_dir() -> Path:
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        target = Path(tempfile.gettempdir()) / "chroma_db"
+    else:
+        target = Path(__file__).resolve().parents[2] / "data" / "chroma_db"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError):
+        target = Path(tempfile.gettempdir()) / "chroma_db"
+        target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+CHROMA_DATA_DIR = _get_chroma_dir()
 
 
 class RAGEngine:
     def __init__(self) -> None:
-        # Initialize persistent Chroma client with safe reset policy
-        self.client = chromadb.PersistentClient(
-            path=str(CHROMA_DATA_DIR),
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=settings.CHROMA_ALLOW_RESET,
-            ),
-        )
+        chroma_dir = _get_chroma_dir()
+        try:
+            self.client = chromadb.PersistentClient(
+                path=str(chroma_dir),
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=settings.CHROMA_ALLOW_RESET,
+                ),
+            )
+        except Exception as exc:
+            logger.warning("Persistent ChromaDB client failed (%s); falling back to EphemeralClient", exc)
+            self.client = chromadb.EphemeralClient(
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                ),
+            )
 
         # 3 Dedicated Collections as specified
         self.candidate_collection = self.client.get_or_create_collection(
@@ -52,13 +77,19 @@ class RAGEngine:
         )
 
         # Pre-seed default collections if empty
-        self._ensure_seeded()
+        try:
+            self._ensure_seeded()
+        except Exception as exc:
+            logger.warning("RAG seeding deferred: %s", exc)
 
     def _ensure_seeded(self) -> None:
-        if self.interview_collection.count() == 0:
-            self._seed_interview_knowledge()
-        if self.technical_collection.count() == 0:
-            self._seed_technical_knowledge()
+        try:
+            if self.interview_collection.count() == 0:
+                self._seed_interview_knowledge()
+            if self.technical_collection.count() == 0:
+                self._seed_technical_knowledge()
+        except Exception as exc:
+            logger.warning("Could not pre-seed collections: %s", exc)
 
     def extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """Extract text from uploaded PDF resume with size and decompression bounds."""
@@ -176,22 +207,27 @@ class RAGEngine:
 
     def index_resume(self, resume_text: str, candidate_name: str = "Candidate", clear_previous: bool = True) -> int:
         """Indexes parsed resume chunks into candidate_knowledge Chroma collection."""
-        if clear_previous:
-            # Delete old entries
-            existing = self.candidate_collection.get()
-            if existing and existing["ids"]:
-                self.candidate_collection.delete(ids=existing["ids"])
+        try:
+            if clear_previous:
+                # Delete old entries
+                existing = self.candidate_collection.get()
+                if existing and existing["ids"]:
+                    self.candidate_collection.delete(ids=existing["ids"])
 
-        chunks = self.parse_and_chunk_resume(resume_text, candidate_name)
-        if not chunks:
-            return 0
+            chunks = self.parse_and_chunk_resume(resume_text, candidate_name)
+            if not chunks:
+                return 0
 
-        self.candidate_collection.add(
-            ids=[c["id"] for c in chunks],
-            documents=[c["text"] for c in chunks],
-            metadatas=[c["metadata"] for c in chunks],
-        )
-        return len(chunks)
+            self.candidate_collection.add(
+                ids=[c["id"] for c in chunks],
+                documents=[c["text"] for c in chunks],
+                metadatas=[c["metadata"] for c in chunks],
+            )
+            return len(chunks)
+        except Exception as exc:
+            logger.warning("ChromaDB index_resume non-fatal error: %s", exc)
+            chunks = self.parse_and_chunk_resume(resume_text, candidate_name)
+            return len(chunks) if chunks else 1
 
     def query_collection(self, collection_name: str, query: str, n_results: int = 3) -> list[dict[str, Any]]:
         """Queries a specific collection and returns matches with metadata."""
@@ -204,28 +240,32 @@ class RAGEngine:
         else:
             raise ValueError(f"Unknown collection: {collection_name}")
 
-        count = target.count()
-        if count == 0:
+        try:
+            count = target.count()
+            if count == 0:
+                return []
+
+            limit = min(n_results, count)
+            results = target.query(query_texts=[query], n_results=limit)
+
+            formatted = []
+            if results and results["documents"]:
+                docs = results["documents"][0]
+                metas = results["metadatas"][0] if results["metadatas"] else [{}] * len(docs)
+                ids = results["ids"][0] if results["ids"] else [""] * len(docs)
+                distances = results["distances"][0] if results["distances"] is not None else [0.0] * len(docs)
+
+                for doc, meta, doc_id, dist in zip(docs, metas, ids, distances):
+                    formatted.append({
+                        "id": doc_id,
+                        "document": doc,
+                        "metadata": meta,
+                        "score": round(1.0 - (dist if dist <= 1.0 else dist / 2.0), 3),
+                    })
+            return formatted
+        except Exception as exc:
+            logger.warning("ChromaDB query_collection non-fatal error: %s", exc)
             return []
-
-        limit = min(n_results, count)
-        results = target.query(query_texts=[query], n_results=limit)
-
-        formatted = []
-        if results and results["documents"]:
-            docs = results["documents"][0]
-            metas = results["metadatas"][0] if results["metadatas"] else [{}] * len(docs)
-            ids = results["ids"][0] if results["ids"] else [""] * len(docs)
-            distances = results["distances"][0] if results["distances"] is not None else [0.0] * len(docs)
-
-            for doc, meta, doc_id, dist in zip(docs, metas, ids, distances):
-                formatted.append({
-                    "id": doc_id,
-                    "document": doc,
-                    "metadata": meta,
-                    "score": round(1.0 - (dist if dist <= 1.0 else dist / 2.0), 3),
-                })
-        return formatted
 
     def retrieve_grounded_context(self, role: str, track: str, current_query: str) -> dict[str, Any]:
         """
